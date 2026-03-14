@@ -1,0 +1,73 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+pip-log.txt
+pip-delete-this-directory.txt
+.python-version
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Database
+*.db
+*.sqlite3
+
+# Logs
+logs/
+*.log
+*.log.*
+
+# Local storage
+storage/*
+!storage/.gitkeep
+
+# Tests
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+.coverage.*
+*.cover
+.hypothesis/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Docker
+.dockerignore
+Dockerfile*
+docker-compose*
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Project specific
+!storage/.gitkeep

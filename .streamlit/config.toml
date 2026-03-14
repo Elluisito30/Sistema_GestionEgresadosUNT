@@ -1,0 +1,32 @@
+[theme]
+primaryColor = "#1f77b4"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f0f2f6"
+textColor = "#31333F"
+font = "sans serif"
+
+[server]
+maxUploadSize = 10
+enableCORS = true
+enableXsrfProtection = true
+
+[browser]
+gatherUsageStats = false
+
+[client]
+showErrorDetails = true
+
+[runner]
+fastReruns = true
+
+[logger]
+level = "error"
+
+# Configuración de la página
+[theme.base]
+base = "light"
+
+# Colores personalizados para la UNT
+[theme.custom]
+untBlue = "#003366"
+untYellow = "#FFD700"

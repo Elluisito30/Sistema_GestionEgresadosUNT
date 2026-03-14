@@ -1,0 +1,9 @@
+streamlit
+psycopg2-binary
+pandas
+plotly
+python-dotenv
+bcrypt
+email-validator
+qrcode[pil]  # Para generar QR
+reportlab    # Para generar PDFs de vouchers
