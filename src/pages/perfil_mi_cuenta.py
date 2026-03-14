@@ -218,66 +218,75 @@ def mostrar_actividad(user):
 
 def obtener_datos_egresado(usuario_id):
     """Obtiene los datos del egresado desde la BD."""
-    with get_db_cursor() as cur:
-        cur.execute("""
-            SELECT e.*, u.email
-            FROM egresados e
-            JOIN usuarios u ON e.usuario_id = u.id
-            WHERE e.usuario_id = %s
-        """, (usuario_id,))
-        
-        columns = [desc[0] for desc in cur.description]
-        row = cur.fetchone()
-        
-        if row:
-            return dict(zip(columns, row))
-        return None
+    try:
+        with get_db_cursor() as cur:
+            cur.execute("""
+                SELECT e.*, u.email
+                FROM egresados e
+                JOIN usuarios u ON e.usuario_id = u.id
+                WHERE e.usuario_id = %s
+            """, (usuario_id,))
+            
+            columns = [desc[0] for desc in cur.description]
+            row = cur.fetchone()
+            
+            if row:
+                return dict(zip(columns, row))
+    except Exception as e:
+        st.error(f"Error cargando datos del egresado: {e}")
+    return None
 
 def obtener_datos_empleador(usuario_id):
     """Obtiene los datos del empleador desde la BD."""
-    with get_db_cursor() as cur:
-        cur.execute("""
-            SELECT 
-                u.email,
-                e.nombres,
-                e.apellidos,
-                e.cargo,
-                e.telefono,
-                e.empresa_id
-            FROM empleadores e
-            JOIN usuarios u ON e.usuario_id = u.id
-            WHERE e.usuario_id = %s
-        """, (usuario_id,))
-        
-        row = cur.fetchone()
-        if row:
-            return {
-                'email': row[0],
-                'nombres': row[1],
-                'apellidos': row[2],
-                'cargo': row[3],
-                'telefono': row[4],
-                'empresa_id': row[5]
-            }
-        return None
+    try:
+        with get_db_cursor() as cur:
+            cur.execute("""
+                SELECT 
+                    u.email,
+                    e.nombres,
+                    e.apellidos,
+                    e.cargo,
+                    e.telefono,
+                    e.empresa_id
+                FROM empleadores e
+                JOIN usuarios u ON e.usuario_id = u.id
+                WHERE e.usuario_id = %s
+            """, (usuario_id,))
+            
+            row = cur.fetchone()
+            if row:
+                return {
+                    'email': row[0],
+                    'nombres': row[1],
+                    'apellidos': row[2],
+                    'cargo': row[3],
+                    'telefono': row[4],
+                    'empresa_id': row[5]
+                }
+    except Exception as e:
+        st.error(f"Error cargando datos del empleador: {e}")
+    return None
 
 def obtener_empresa(empresa_id):
     """Obtiene los datos de una empresa."""
-    with get_db_cursor() as cur:
-        cur.execute("""
-            SELECT razon_social, ruc, estado
-            FROM empresas
-            WHERE id = %s
-        """, (empresa_id,))
-        
-        row = cur.fetchone()
-        if row:
-            return {
-                'razon_social': row[0],
-                'ruc': row[1],
-                'estado': row[2]
-            }
-        return None
+    try:
+        with get_db_cursor() as cur:
+            cur.execute("""
+                SELECT razon_social, ruc, estado
+                FROM empresas
+                WHERE id = %s
+            """, (empresa_id,))
+            
+            row = cur.fetchone()
+            if row:
+                return {
+                    'razon_social': row[0],
+                    'ruc': row[1],
+                    'estado': row[2]
+                }
+    except Exception as e:
+        st.error(f"Error cargando empresa: {e}")
+    return None
 
 def guardar_perfil_egresado(usuario_id, nombres, ape_paterno, ape_materno,
                            fecha_nac, telefono, direccion, carrera,
@@ -310,9 +319,15 @@ def guardar_perfil_egresado(usuario_id, nombres, ape_paterno, ape_materno,
             
             # Procesar CV si se subió uno nuevo
             if cv_file:
-                # Aquí iría la lógica para guardar el archivo
-                # Por ahora solo simulamos
-                cv_path = f"/app/storage/cv/{usuario_id}_{cv_file.name}"
+                import os
+                # Crear la carpeta de storage si no existe
+                storage_dir = "storage/cv"
+                os.makedirs(storage_dir, exist_ok=True)
+                
+                cv_path = f"{storage_dir}/{usuario_id}_{cv_file.name}"
+                with open(cv_path, "wb") as f:
+                    f.write(cv_file.getbuffer())
+                
                 # Guardar referencia en BD
                 cur.execute("""
                     UPDATE egresados

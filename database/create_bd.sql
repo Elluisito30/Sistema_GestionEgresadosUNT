@@ -2,7 +2,7 @@
 -- SCRIPT DE CREACIÓN DE BASE DE DATOS - SISTEMA DE EGRESADOS UNT
 -- =====================================================
 -- Crear la base de datos (ejecutar como superusuario)
--- CREATE DATABASE egresados_unt_db;
+-- CREATE DATABASE bd_egresadosUNT;
 -- =====================================================
 
 -- Habilitar extensión para UUIDs (recomendado para claves primarias)

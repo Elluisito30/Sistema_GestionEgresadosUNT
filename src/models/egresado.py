@@ -130,7 +130,7 @@ class Egresado:
                 JOIN inscripciones_eventos i ON e.id = i.evento_id
                 WHERE i.usuario_id = %s
                 ORDER BY e.fecha_inicio DESC
-            ``, (self.usuario_id,))
+            """, (self.usuario_id,))
             
             columns = [desc[0] for desc in cur.description]
             return [dict(zip(columns, row)) for row in cur.fetchall()]
@@ -146,7 +146,7 @@ class Egresado:
                     COUNT(*) FILTER (WHERE estado = 'entrevista') as entrevistas
                 FROM postulaciones
                 WHERE egresado_id = %s
-            ``, (self.id,))
+            """, (self.id,))
             
             stats = cur.fetchone()
             
@@ -195,7 +195,7 @@ class Egresado:
                         foto_perfil_url = %s,
                         fecha_actualizacion = NOW()
                     WHERE id = %s
-                ``, (
+                """, (
                     self.nombres, self.apellido_paterno, self.apellido_materno,
                     self.fecha_nacimiento, self.telefono, self.direccion,
                     self.carrera_principal, self.facultad, self.anio_egreso,
@@ -212,7 +212,7 @@ class Egresado:
                         carrera_principal, facultad, anio_egreso, perfil_publico
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
-                ``, (
+                """, (
                     self.usuario_id, self.nombres, self.apellido_paterno,
                     self.apellido_materno, self.dni, self.fecha_nacimiento,
                     self.telefono, self.direccion, self.carrera_principal,

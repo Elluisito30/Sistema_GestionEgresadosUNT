@@ -14,6 +14,29 @@ st.set_page_config(
 # Inicializar el estado de la sesión
 init_session_state()
 
+# CSS Personalizado para un diseño más limpio
+st.markdown("""
+    <style>
+    [data-testid="stForm"] {
+        background-color: #f8f9fa;
+        padding: 2rem;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .stButton>button {
+        background-color: #0056b3;
+        color: white;
+        border-radius: 5px;
+        padding: 0.5rem 1rem;
+        font-weight: bold;
+    }
+    .stButton>button:hover {
+        background-color: #004494;
+        color: white;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 # Lógica de Login / Router
 if not st.session_state.get('authenticated', False):
     # --- PANTALLA DE LOGIN ---
@@ -23,7 +46,8 @@ if not st.session_state.get('authenticated', False):
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         with st.form("login_form"):
-            email = st.text_input("Correo Electrónico Institucional")
+            st.markdown("<h3 style='text-align: center;'>Acceso al Sistema</h3>", unsafe_allow_html=True)
+            email = st.text_input("Correo Electrónico")
             password = st.text_input("Contraseña", type="password")
             submitted = st.form_submit_button("Iniciar Sesión", use_container_width=True)
 
@@ -39,7 +63,7 @@ if not st.session_state.get('authenticated', False):
                     else:
                         st.error(error)
 
-        st.markdown("---")
+        st.markdown("<br>", unsafe_allow_html=True)
         # Enlaces para recuperar contraseña o registrarse (a implementar)
         col_a, col_b = st.columns(2)
         with col_a:

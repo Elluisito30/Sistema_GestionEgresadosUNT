@@ -3,7 +3,7 @@ import streamlit as st
 from src.utils.database import get_db_cursor
 from src.config import SECRET_KEY  # Aunque no lo usamos directamente para hash aquí
 import re
-from email_validator import validate_email, EmailNotValidError
+from src.utils.validators import validar_email
 
 def hash_password(password):
     """Genera un hash seguro de la contraseña."""
@@ -16,24 +16,21 @@ def verify_password(password, hashed):
 
 def validar_correo_unt(email):
     """Valida que el correo sea del dominio institucional (ej. @unitru.edu.pe)."""
-    try:
-        validation = validate_email(email, check_deliverability=False)
-        email = validation.email
-        if not email.endswith('@unitru.edu.pe'): # Ajustar al dominio real
-            return False, "El correo debe ser del dominio @unitru.edu.pe"
-        return True, email
-    except EmailNotValidError as e:
-        return False, str(e)
+    valido, mensaje_o_email = validar_email(email, dominio_institucional='unitru.edu.pe')
+    return valido, mensaje_o_email
 
 def login_usuario(email, password):
     """Autentica un usuario y retorna sus datos si es exitoso."""
-    with get_db_cursor() as cur:
-        cur.execute("""
-            SELECT id, email, password_hash, rol, activo
-            FROM usuarios
-            WHERE email = %s
-        """, (email,))
-        user = cur.fetchone()
+    try:
+        with get_db_cursor() as cur:
+            cur.execute("""
+                SELECT id, email, password_hash, rol, activo
+                FROM usuarios
+                WHERE email = %s
+            """, (email,))
+            user = cur.fetchone()
+    except Exception as e:
+        return None, "Error de conexión con la base de datos. Por favor, intente más tarde."
 
     if user:
         user_id, db_email, db_password_hash, rol, activo = user
