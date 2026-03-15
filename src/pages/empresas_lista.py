@@ -209,26 +209,26 @@ def mostrar_estadisticas_empresas():
             ORDER BY COUNT(*) DESC
         """)
         datos_sector = cur.fetchall()
-    
-    if datos_sector:
-        df_sector = pd.DataFrame(datos_sector, columns=['Sector', 'Cantidad'])
         
-        col_a, col_b = st.columns(2)
-        with col_a:
-            st.subheader("Empresas por Sector")
-            st.bar_chart(df_sector.set_index('Sector'))
-        
-        with col_b:
-            st.subheader("Distribución por Tamaño")
-            cur.execute("""
-                SELECT tamano_empresa, COUNT(*)
-                FROM empresas
-                WHERE estado = 'activa'
-                GROUP BY tamano_empresa
-            """)
-            df_tamano = pd.DataFrame(cur.fetchall(), columns=['Tamaño', 'Cantidad'])
-            if not df_tamano.empty:
-                st.dataframe(df_tamano)
+        if datos_sector:
+            df_sector = pd.DataFrame(datos_sector, columns=['Sector', 'Cantidad'])
+            
+            col_a, col_b = st.columns(2)
+            with col_a:
+                st.subheader("Empresas por Sector")
+                st.bar_chart(df_sector.set_index('Sector'))
+            
+            with col_b:
+                st.subheader("Distribución por Tamaño")
+                cur.execute("""
+                    SELECT tamano_empresa, COUNT(*)
+                    FROM empresas
+                    WHERE estado = 'activa'
+                    GROUP BY tamano_empresa
+                """)
+                df_tamano = pd.DataFrame(cur.fetchall(), columns=['Tamaño', 'Cantidad'])
+                if not df_tamano.empty:
+                    st.dataframe(df_tamano)
     
     # Empresas con más ofertas
     st.subheader("Top 10 Empresas con más Ofertas")

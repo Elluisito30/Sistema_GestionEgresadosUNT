@@ -249,6 +249,15 @@ CREATE TABLE notificaciones (
     metadata JSONB -- Datos adicionales (ej. id de la oferta que generó la notificación)
 );
 
+-- 17. TABLA CHAT EVENTOS (NETWORKING)
+CREATE TABLE chat_eventos (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    evento_id UUID NOT NULL REFERENCES eventos(id) ON DELETE CASCADE,
+    usuario_id UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    mensaje TEXT NOT NULL,
+    fecha_envio TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 -- 16. TABLA BITACORA DE AUDITORIA (SEGURIDAD)
 CREATE TABLE bitacora_auditoria (
     id BIGSERIAL PRIMARY KEY,
@@ -279,6 +288,8 @@ CREATE INDEX idx_eventos_fecha_inicio ON eventos(fecha_inicio);
 CREATE INDEX idx_pagos_usuario_id ON pagos(usuario_id);
 CREATE INDEX idx_bitacora_fecha ON bitacora_auditoria(fecha_hora);
 CREATE INDEX idx_bitacora_usuario ON bitacora_auditoria(usuario_id);
+CREATE INDEX idx_chat_evento_id ON chat_eventos(evento_id);
+CREATE INDEX idx_chat_fecha_envio ON chat_eventos(fecha_envio);
 
 -- =====================================================
 -- VISTAS ÚTILES (Ejemplos)

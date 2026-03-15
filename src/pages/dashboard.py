@@ -214,10 +214,25 @@ def show():
     rol = user['rol']
 
     with st.sidebar:
-        st.image("https://www.unitru.edu.pe/images/logo_unt.png", width=100)
-        st.markdown(f"### ¡Bienvenido, {user['email']}!")
-        st.markdown(f"**Rol:** `{rol.capitalize()}`")
+        # Logo de la universidad
+        st.image("https://upload.wikimedia.org/wikipedia/commons/6/6e/Universidad_Nacional_de_Trujillo_-_Per%C3%BA_vector_logo.png", use_container_width=True)
+        
+        # Título decorativo
+        st.markdown("<h2 style='text-align: center; color: #0056b3;'>🎓 Gestión UNT</h2>", unsafe_allow_html=True)
         st.markdown("---")
+
+        # Información del usuario con estilo
+        st.markdown(f"""
+            <div style='background-color: #f0f2f6; padding: 10px; border-radius: 5px; margin-bottom: 10px;'>
+                <p style='margin: 0; font-size: 0.9rem; color: #555;'>Usuario:</p>
+                <p style='margin: 0; font-weight: bold;'>👤 {user['email']}</p>
+                <p style='margin: 0; font-size: 0.9rem; color: #555; margin-top: 5px;'>Rol:</p>
+                <p style='margin: 0; font-weight: bold;'>🛡️ {rol.capitalize()}</p>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("---")
+        st.markdown("### 🧭 Navegación")
 
         if rol == 'administrador':
             menu_options = {
@@ -231,6 +246,7 @@ def show():
                 "📝 Encuestas": "encuestas_disenar",
                 "🔍 Consultas Avanzadas": "consultas_avanzadas",
                 "📋 Bitácora": "auditoria_bitacora",
+                "🔔 Notificaciones": "notificaciones_centro",
                 "👤 Mi Perfil": "perfil_mi_cuenta"
             }
         elif rol == 'egresado':
@@ -241,7 +257,8 @@ def show():
                 "📋 Mis Postulaciones": "postulaciones_seguimiento",
                 "📅 Eventos": "eventos_calendario",
                 "📄 Mis Pagos": "pagos_mis_vouchers",
-                "📝 Encuestas Pendientes": "encuestas_responder"
+                "📝 Encuestas Pendientes": "encuestas_responder",
+                "🔔 Notificaciones": "notificaciones_centro"
             }
         elif rol == 'empleador':
             menu_options = {
@@ -250,6 +267,7 @@ def show():
                 "📢 Gestionar Ofertas": "ofertas_gestionar",
                 "👥 Revisar Postulaciones": "postulaciones_revisar",
                 "📅 Mis Eventos": "eventos_gestionar",
+                "🔔 Notificaciones": "notificaciones_centro",
                 "👤 Mi Perfil": "perfil_mi_cuenta"
             }
         else:

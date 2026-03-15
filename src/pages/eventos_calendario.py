@@ -1,423 +1,183 @@
 """
 Módulo de eventos y networking.
-Muestra calendario de eventos y permite inscripciones.
+Organizado por pestañas para una mejor experiencia de usuario.
 """
 import streamlit as st
 import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
-from datetime import datetime, date, timedelta
+from datetime import datetime, timedelta, timezone
 from src.utils.database import get_db_cursor
-from src.utils.session import add_notification
-import calendar
+from src.utils.decorators import login_required
+from src.models.evento import Evento
+from src.utils.notifications import NotificationSystem
+from src.utils.email import enviar_notificacion_evento
+from src.utils.pdf_generator import generar_pdf_constancia
 
+@login_required
 def show():
-    """Muestra la página de calendario de eventos."""
+    """Muestra el módulo de eventos y networking organizado por pestañas."""
+    st.title("📅 Eventos y Networking")
     
-    st.title("📅 Calendario de Eventos")
-    
-    user = st.session_state.user
-    rol = user['rol']
-    
-    # Tabs para diferentes vistas
-    tab1, tab2, tab3 = st.tabs([
-        "📋 Próximos Eventos",
-        "🗓️ Calendario",
-        "📝 Mis Inscripciones"
+    # Crear pestañas principales
+    tab_proximos, tab_constancias, tab_networking = st.tabs([
+        "🚀 Próximos Eventos", 
+        "📜 Mis Constancias", 
+        "🤝 Networking y Comunidad"
     ])
     
-    with tab1:
-        mostrar_proximos_eventos(rol)
+    usuario_id = st.session_state.user['id']
+    hoy = datetime.now(timezone.utc)
     
-    with tab2:
-        mostrar_vista_calendario()
-    
-    with tab3:
-        mostrar_mis_inscripciones(user['id'])
-
-def mostrar_proximos_eventos(rol):
-    """Muestra la lista de próximos eventos."""
-    
-    st.subheader("Próximos Eventos")
-    
-    # Filtros
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        tipo_filtro = st.selectbox(
-            "Tipo de Evento",
-            options=['Todos', 'feria_laboral', 'webinar', 'charla', 'curso']
-        )
-    
-    with col2:
-        fecha_desde = st.date_input(
-            "Desde",
-            value=date.today()
-        )
-    
-    with col3:
-        fecha_hasta = st.date_input(
-            "Hasta",
-            value=date.today() + timedelta(days=60)
-        )
-    
-    # Construir query
-    query = """
-        SELECT 
-            e.id,
-            e.titulo,
-            e.descripcion,
-            e.tipo,
-            e.fecha_inicio,
-            e.fecha_fin,
-            e.lugar,
-            e.capacidad_maxima,
-            e.es_gratuito,
-            e.precio,
-            e.imagen_promocional_url,
-            u.email as organizador,
-            COUNT(i.id) as inscritos,
-            BOOL_OR(i.usuario_id = %s) as ya_inscrito
-        FROM eventos e
-        JOIN usuarios u ON e.publicado_por = u.id
-        LEFT JOIN inscripciones_eventos i ON e.id = i.evento_id
-        WHERE e.activo = true
-        AND e.fecha_inicio >= %s
-        AND e.fecha_fin <= %s
-    """
-    params = [st.session_state.user['id'], fecha_desde, fecha_hasta]
-    
-    if tipo_filtro != 'Todos':
-        query += " AND e.tipo = %s"
-        params.append(tipo_filtro)
-    
-    query += """
-        GROUP BY e.id, u.email
-        ORDER BY e.fecha_inicio ASC
-    """
-    
-    with get_db_cursor() as cur:
-        cur.execute(query, params)
-        eventos = cur.fetchall()
+    # --- PESTAÑA 1: PRÓXIMOS EVENTOS ---
+    with tab_proximos:
+        st.subheader("Explora nuevos eventos")
         
-        if not eventos:
-            st.info("No hay eventos programados para las fechas seleccionadas.")
-            return
+        # Filtro por tipo
+        filtro_tipo = st.selectbox("Filtrar por tipo", ["Todos", "feria_laboral", "webinar", "charla", "curso"], key="filter_proximos")
         
-        for evento in eventos:
-            mostrar_tarjeta_evento(evento, rol)
-
-def mostrar_tarjeta_evento(evento, rol):
-    """Muestra un evento en formato de tarjeta."""
-    
-    (id, titulo, descripcion, tipo, fecha_inicio, fecha_fin,
-     lugar, capacidad, gratuito, precio, imagen, organizador,
-     inscritos, ya_inscrito) = evento
-    
-    with st.container():
-        col1, col2, col3 = st.columns([2, 3, 1])
-        
-        with col1:
-            # Imagen o ícono del evento
-            if imagen:
-                st.image(imagen, width=200)
-            else:
-                # Mostrar ícono según tipo
-                iconos = {
-                    'feria_laboral': '🏢',
-                    'webinar': '💻',
-                    'charla': '🎤',
-                    'curso': '📚'
-                }
-                st.markdown(f"<h1 style='text-align: center'>{iconos.get(tipo, '📅')}</h1>", 
-                          unsafe_allow_html=True)
-        
-        with col2:
-            st.markdown(f"### {titulo}")
-            st.markdown(f"**Tipo:** {tipo.replace('_', ' ').title()}")
-            st.markdown(f"**Fecha:** {fecha_inicio.strftime('%d/%m/%Y %H:%M')} - {fecha_fin.strftime('%d/%m/%Y %H:%M')}")
-            st.markdown(f"**Lugar:** {lugar}")
-            st.markdown(f"**Organizado por:** {organizador}")
+        eventos = Evento.get_all()
+        if filtro_tipo != "Todos":
+            eventos = [e for e in eventos if e.tipo == filtro_tipo]
             
-            # Capacidad
-            if capacidad:
-                porcentaje = (inscritos / capacidad) * 100
-                st.progress(porcentaje / 100, text=f"Inscritos: {inscritos}/{capacidad} ({porcentaje:.1f}%)")
+        # Solo mostrar eventos que NO han terminado
+        eventos_futuros = [e for e in eventos if (e.fecha_fin if e.fecha_fin.tzinfo else e.fecha_fin.replace(tzinfo=timezone.utc)) >= hoy]
         
-        with col3:
-            # Precio
-            if gratuito:
-                st.markdown("### 🆓 GRATUITO")
-            else:
-                st.markdown(f"### 💰 S/. {precio:.2f}")
-            
-            # Botón de inscripción
-            if ya_inscrito:
-                st.button("✅ Ya inscrito", disabled=True, use_container_width=True)
-                
-                if st.button("📄 Ver constancia", key=f"const_{id}", use_container_width=True):
-                    generar_constancia(id, st.session_state.user['id'])
-            else:
-                if capacidad and inscritos >= capacidad:
-                    st.button("❌ Cupo lleno", disabled=True, use_container_width=True)
-                else:
-                    if st.button("📝 Inscribirme", key=f"ins_{id}", use_container_width=True):
-                        inscribirse_evento(id)
-        
-        # Descripción en expander
-        with st.expander("Ver descripción completa"):
-            st.markdown(descripcion)
-        
-        st.markdown("---")
-
-def mostrar_vista_calendario():
-    """Muestra una vista de calendario con los eventos."""
-    
-    st.subheader("Calendario de Eventos")
-    
-    # Obtener eventos del mes
-    hoy = date.today()
-    primer_dia = date(hoy.year, hoy.month, 1)
-    ultimo_dia = date(hoy.year, hoy.month, calendar.monthrange(hoy.year, hoy.month)[1])
-    
-    with get_db_cursor() as cur:
-        cur.execute("""
-            SELECT 
-                fecha_inicio::date as fecha,
-                COUNT(*) as total_eventos,
-                STRING_AGG(titulo, ' | ') as titulos
-            FROM eventos
-            WHERE activo = true
-            AND fecha_inicio::date BETWEEN %s AND %s
-            GROUP BY fecha_inicio::date
-            ORDER BY fecha
-        """, (primer_dia, ultimo_dia))
-        
-        eventos_por_dia = cur.fetchall()
-    
-    # Crear DataFrame para el calendario
-    dias_mes = []
-    for dia in range(1, ultimo_dia.day + 1):
-        fecha_actual = date(hoy.year, hoy.month, dia)
-        eventos_dia = [e for e in eventos_por_dia if e[0] == fecha_actual]
-        
-        if eventos_dia:
-            dias_mes.append({
-                'Día': dia,
-                'Eventos': eventos_dia[0][1],
-                'Títulos': eventos_dia[0][2]
-            })
+        if not eventos_futuros:
+            st.info("No hay eventos programados en este momento.")
         else:
-            dias_mes.append({
-                'Día': dia,
-                'Eventos': 0,
-                'Títulos': ''
-            })
-    
-    df_calendario = pd.DataFrame(dias_mes)
-    
-    # Mostrar calendario en grid
-    cols = st.columns(7)
-    dias_semana = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
-    
-    for i, dia in enumerate(dias_semana):
-        cols[i].markdown(f"**{dia}**")
-    
-    # Determinar primer día de la semana
-    primer_dia_semana = primer_dia.weekday()  # 0 = lunes
-    
-    # Mostrar días en blanco antes del primer día
-    for i in range(primer_dia_semana):
-        cols[i].write("")
-    
-    # Mostrar días del mes
-    for dia in df_calendario.itertuples():
-        col_idx = (dia.Día + primer_dia_semana - 1) % 7
-        with cols[col_idx]:
-            if dia.Eventos > 0:
-                with st.container():
-                    st.markdown(f"**{dia.Día}**")
-                    st.markdown(f"🎉 {dia.Eventos}")
-                    if st.button("Ver", key=f"cal_{dia.Día}"):
-                        st.info(dia.Títulos)
-            else:
-                st.markdown(f"**{dia.Día}**")
+            for ev in eventos_futuros:
+                with st.container(border=True):
+                    c1, c2 = st.columns([3, 1])
+                    with c1:
+                        st.markdown(f"### {ev.titulo}")
+                        st.write(ev.descripcion)
+                        st.caption(f"📅 **Fecha:** {ev.fecha_inicio.strftime('%d/%m/%Y %H:%M')} | 📍 **Lugar:** {ev.lugar}")
+                        if not ev.es_gratuito:
+                            st.warning(f"💰 Precio: S/. {ev.precio}")
+                    
+                    with c2:
+                        # Comprobar inscripción
+                        with get_db_cursor() as cur:
+                            cur.execute("SELECT 1 FROM inscripciones_eventos WHERE evento_id = %s AND usuario_id = %s", (ev.id, usuario_id))
+                            ya_inscrito = cur.fetchone() is not None
 
-def mostrar_mis_inscripciones(usuario_id):
-    """Muestra los eventos a los que el usuario está inscrito."""
-    
-    st.subheader("Mis Inscripciones")
-    
-    with get_db_cursor() as cur:
-        cur.execute("""
-            SELECT 
-                e.titulo,
-                e.tipo,
-                e.fecha_inicio,
-                e.fecha_fin,
-                e.lugar,
-                i.fecha_inscripcion,
-                i.asistio,
-                i.pago_id,
-                e.id as evento_id
-            FROM inscripciones_eventos i
-            JOIN eventos e ON i.evento_id = e.id
-            WHERE i.usuario_id = %s
-            ORDER BY e.fecha_inicio DESC
-        """, (usuario_id,))
-        
-        inscripciones = cur.fetchall()
-        
-        if not inscripciones:
-            st.info("No estás inscrito en ningún evento.")
-            return
-        
-        # Separar en eventos pasados y futuros
-        ahora = datetime.now()
-        futuros = []
-        pasados = []
-        
-        for ins in inscripciones:
-            if ins[2] > ahora:  # fecha_inicio > ahora
-                futuros.append(ins)
-            else:
-                pasados.append(ins)
-        
-        if futuros:
-            st.subheader("📌 Próximos Eventos")
-            for ins in futuros:
-                with st.container():
-                    col1, col2 = st.columns([3, 1])
-                    
-                    with col1:
-                        st.markdown(f"**{ins[0]}**")
-                        st.markdown(f"📅 {ins[2].strftime('%d/%m/%Y %H:%M')} | 📍 {ins[4]}")
-                    
-                    with col2:
-                        if st.button("Cancelar inscripción", key=f"cancel_{ins[8]}"):
-                            cancelar_inscripcion(ins[8], usuario_id)
-                    
-                    st.markdown("---")
-        
-        if pasados:
-            st.subheader("✅ Eventos Pasados")
-            for ins in pasados:
-                with st.container():
-                    col1, col2, col3 = st.columns([3, 1, 1])
-                    
-                    with col1:
-                        st.markdown(f"**{ins[0]}**")
-                        st.markdown(f"📅 {ins[2].strftime('%d/%m/%Y')}")
-                    
-                    with col2:
-                        if ins[6]:  # asistio
-                            st.markdown("✅ Asistió")
+                        if ya_inscrito:
+                            st.success("✅ Ya estás inscrito")
                         else:
-                            st.markdown("❌ No asistió")
-                    
-                    with col3:
-                        if not ins[7]:  # no tiene constancia
-                            if st.button("📄 Generar constancia", key=f"const_{ins[8]}"):
-                                generar_constancia(ins[8], usuario_id)
-                    
-                    st.markdown("---")
+                            if st.button("📝 Inscribirme", key=f"btn_ins_{ev.id}", type="primary"):
+                                exito, mensaje = Evento.inscribir_usuario(ev.id, usuario_id)
+                                if exito:
+                                    st.success("¡Inscripción exitosa!")
+                                    NotificationSystem.create(usuario_id, "Inscripción a Evento", f"Te has inscrito a {ev.titulo}")
+                                    enviar_notificacion_evento(st.session_state.user['email'], ev.titulo, ev.fecha_inicio.strftime('%d/%m/%Y'))
+                                    st.rerun()
+                                else:
+                                    st.error(mensaje)
 
-def inscribirse_evento(evento_id):
-    """Procesa la inscripción a un evento."""
-    
-    try:
-        with get_db_cursor(commit=True) as cur:
-            # Verificar si el evento es gratuito o de pago
-            cur.execute("""
-                SELECT es_gratuito, precio, capacidad_maxima,
-                       (SELECT COUNT(*) FROM inscripciones_eventos WHERE evento_id = %s) as inscritos
-                FROM eventos
-                WHERE id = %s
-            """, (evento_id, evento_id))
-            
-            gratuito, precio, capacidad, inscritos = cur.fetchone()
-            
-            # Verificar capacidad
-            if capacidad and inscritos >= capacidad:
-                add_notification("El evento ha alcanzado su capacidad máxima", "error")
-                return
-            
-            if gratuito:
-                # Inscripción gratuita
-                cur.execute("""
-                    INSERT INTO inscripciones_eventos (evento_id, usuario_id)
-                    VALUES (%s, %s)
-                """, (evento_id, st.session_state.user['id']))
-                
-                add_notification("¡Inscripción exitosa!", "success")
-            else:
-                # Redirigir a pago
-                st.session_state.pago_pendiente = {
-                    'evento_id': evento_id,
-                    'monto': precio,
-                    'concepto': 'evento'
-                }
-                st.switch_page("pages/pagos_realizar.py")
-            
-            st.rerun()
-            
-    except Exception as e:
-        add_notification(f"Error al inscribirse: {str(e)}", "error")
-
-def cancelar_inscripcion(evento_id, usuario_id):
-    """Cancela una inscripción a evento."""
-    
-    try:
-        with get_db_cursor(commit=True) as cur:
-            cur.execute("""
-                DELETE FROM inscripciones_eventos
-                WHERE evento_id = %s AND usuario_id = %s
-            """, (evento_id, usuario_id))
-            
-            add_notification("Inscripción cancelada exitosamente", "success")
-            st.rerun()
-            
-    except Exception as e:
-        add_notification(f"Error al cancelar: {str(e)}", "error")
-
-def generar_constancia(evento_id, usuario_id):
-    """Genera una constancia de participación."""
-    
-    try:
+    # --- PESTAÑA 2: MIS CONSTANCIAS ---
+    with tab_constancias:
+        st.subheader("Eventos finalizados y certificados")
+        
+        # Obtener eventos donde el usuario está inscrito y el evento ya terminó
         with get_db_cursor() as cur:
-            # Verificar asistencia
             cur.execute("""
-                UPDATE inscripciones_eventos
-                SET asistio = true
-                WHERE evento_id = %s AND usuario_id = %s
-                RETURNING id
-            """, (evento_id, usuario_id))
-            
-            if not cur.fetchone():
-                add_notification("No se encontró la inscripción", "error")
-                return
-            
-            # Obtener datos para la constancia
-            cur.execute("""
-                SELECT 
-                    e.titulo,
-                    e.fecha_inicio,
-                    e.fecha_fin,
-                    u.nombres || ' ' || u.apellido_paterno as nombre_completo
+                SELECT e.id, e.titulo, e.fecha_inicio, e.fecha_fin, ie.asistio
                 FROM eventos e
-                CROSS JOIN egresados u
-                WHERE e.id = %s AND u.usuario_id = %s
-            """, (evento_id, usuario_id))
+                JOIN inscripciones_eventos ie ON e.id = ie.evento_id
+                WHERE ie.usuario_id = %s AND e.fecha_fin < %s
+                ORDER BY e.fecha_fin DESC
+            """, (usuario_id, hoy))
+            eventos_pasados = cur.fetchall()
             
-            datos = cur.fetchone()
+        if not eventos_pasados:
+            st.info("Aún no tienes eventos finalizados en tu historial.")
+        else:
+            for ev_id, titulo, f_ini, f_fin, asistio in eventos_pasados:
+                with st.container(border=True):
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        st.markdown(f"#### {titulo}")
+                        st.caption(f"📅 Finalizó el: {f_fin.strftime('%d/%m/%Y')}")
+                        if asistio:
+                            st.success("Asistencia confirmada")
+                        else:
+                            st.error("No se registró asistencia")
+                    
+                    with col2:
+                        if asistio:
+                            # Obtener nombre para el PDF
+                            with get_db_cursor() as cur:
+                                cur.execute("SELECT nombres, apellido_paterno, apellido_materno FROM egresados WHERE usuario_id = %s", (usuario_id,))
+                                datos_egr = cur.fetchone()
+                                nombre_pdf = f"{datos_egr[0]} {datos_egr[1]} {datos_egr[2]}" if datos_egr else st.session_state.user['email']
+
+                            pdf_data = generar_pdf_constancia(nombre_pdf, titulo, f_ini.strftime('%d/%m/%Y'))
+                            st.download_button(
+                                label="📜 PDF",
+                                data=pdf_data,
+                                file_name=f"constancia_{titulo.replace(' ', '_')}.pdf",
+                                mime="application/pdf",
+                                key=f"dl_hist_{ev_id}"
+                            )
+
+    # --- PESTAÑA 3: NETWORKING Y COMUNIDAD ---
+    with tab_networking:
+        st.subheader("Conecta con otros participantes")
+        
+        # Solo mostrar chat de eventos en los que el usuario está inscrito (actuales o futuros)
+        with get_db_cursor() as cur:
+            cur.execute("""
+                SELECT e.id, e.titulo 
+                FROM eventos e
+                JOIN inscripciones_eventos ie ON e.id = ie.evento_id
+                WHERE ie.usuario_id = %s AND e.activo = TRUE
+                ORDER BY e.fecha_inicio ASC
+            """, (usuario_id,))
+            mis_eventos_chat = cur.fetchall()
+
+        if not mis_eventos_chat:
+            st.warning("Inscríbete en un evento para acceder a su comunidad de chat.")
+        else:
+            # Seleccionar evento para el chat
+            opciones_chat = {titulo: eid for eid, titulo in mis_eventos_chat}
+            sel_titulo = st.selectbox("Selecciona la comunidad del evento:", options=list(opciones_chat.keys()))
+            sel_id = opciones_chat[sel_titulo]
             
-            if not datos:
-                add_notification("No se encontraron los datos necesarios", "error")
-                return
-            
-            # Aquí iría la lógica para generar el PDF
-            # Por ahora simulamos
-            add_notification(f"Constancia generada para: {datos[3]} - {datos[0]}", "success")
-            
-    except Exception as e:
-        add_notification(f"Error al generar constancia: {str(e)}", "error")
+            with st.container(border=True):
+                st.markdown(f"### Chat: {sel_titulo}")
+                
+                # Mostrar mensajes
+                mensajes = Evento.get_mensajes_chat(sel_id)
+                
+                # Scrollable area simulada con container
+                with st.container(height=400):
+                    if not mensajes:
+                        st.caption("No hay mensajes aún. ¡Sé el primero en saludar!")
+                    else:
+                        for msg, fecha, email, rol in mensajes:
+                            is_me = email == st.session_state.user['email']
+                            align = "right" if is_me else "left"
+                            color = "#e3f2fd" if is_me else "#f5f5f5"
+                            
+                            st.markdown(f"""
+                                <div style='text-align: {align}; margin-bottom: 10px;'>
+                                    <div style='display: inline-block; background-color: {color}; padding: 8px 15px; border-radius: 15px; max-width: 80%;'>
+                                        <p style='margin: 0; font-size: 0.8rem; color: #666;'><b>{email}</b> ({rol})</p>
+                                        <p style='margin: 5px 0;'>{msg}</p>
+                                        <p style='margin: 0; font-size: 0.7rem; color: #999;'>{fecha.strftime('%H:%M')}</p>
+                                    </div>
+                                </div>
+                            """, unsafe_allow_html=True)
+
+                # Formulario para enviar mensaje
+                with st.form("chat_form_new", clear_on_submit=True):
+                    col_input, col_btn = st.columns([4, 1])
+                    with col_input:
+                        nuevo_msg = st.text_input("Mensaje...", placeholder="Escribe algo...")
+                    with col_btn:
+                        if st.form_submit_button("Enviar", use_container_width=True):
+                            if nuevo_msg:
+                                exito, error = Evento.enviar_mensaje_chat(sel_id, usuario_id, nuevo_msg)
+                                if exito:
+                                    st.rerun()
+                                else:
+                                    st.error(error)

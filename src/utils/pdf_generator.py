@@ -1,264 +1,145 @@
 """
-Utilidades para generación de PDFs.
+Generador de constancias en formato PDF.
+Utiliza reportlab para crear un diseño formal y profesional.
 """
-import io
-from datetime import datetime
+from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4, letter
-from reportlab.lib.units import inch, cm
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
+from reportlab.lib.units import cm
 from reportlab.pdfgen import canvas
-import qrcode
-from typing import Dict, Any, Optional
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
+from datetime import datetime
+import io
 
-class PDFGenerator:
-    """Generador de PDFs para constancias y vouchers."""
-    
-    @staticmethod
-    def generar_voucher(datos_pago: Dict[str, Any], qr_data: Optional[bytes] = None) -> bytes:
-        """
-        Genera un PDF de voucher de pago.
-        
-        Args:
-            datos_pago: Diccionario con datos del pago
-            qr_data: Imagen QR en bytes (opcional)
-        
-        Returns:
-            bytes: Contenido del PDF
-        """
-        buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4)
-        story = []
-        styles = getSampleStyleSheet()
-        
-        # Título
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=24,
-            textColor=colors.HexColor('#003366'),
-            alignment=1,  # Centro
-            spaceAfter=30
-        )
-        story.append(Paragraph("VOUCHER DE PAGO", title_style))
-        
-        # Línea separadora
-        story.append(Spacer(1, 0.5*cm))
-        
-        # Datos del voucher
-        data = [
-            ['Código:', datos_pago.get('codigo', '')],
-            ['Fecha:', datos_pago.get('fecha', datetime.now().strftime('%d/%m/%Y %H:%M'))],
-            ['Usuario:', datos_pago.get('usuario', '')],
-            ['Email:', datos_pago.get('email', '')],
-            ['Concepto:', datos_pago.get('concepto', '').upper()],
-            ['Monto:', f"S/. {datos_pago.get('monto', 0):,.2f}"],
-            ['Estado:', 'PAGADO']
-        ]
-        
-        table = Table(data, colWidths=[100, 300])
-        table.setStyle(TableStyle([
-            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 12),
-            ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#003366')),
-            ('TEXTCOLOR', (1, 0), (1, -1), colors.black),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
-        ]))
-        
-        story.append(table)
-        story.append(Spacer(1, 2*cm))
-        
-        # QR
-        if qr_data:
-            qr_buffer = io.BytesIO(qr_data)
-            qr_buffer.seek(0)
-            img = Image(qr_buffer, width=3*cm, height=3*cm)
-            story.append(img)
-        
-        # Texto de validación
-        story.append(Spacer(1, 1*cm))
-        validation_text = f"Validar en: https://sistema.unitru.edu.pe/validar/{datos_pago.get('codigo', '')}"
-        story.append(Paragraph(validation_text, styles['Normal']))
-        
-        story.append(Spacer(1, 0.5*cm))
-        disclaimer = "Este voucher es válido solo con presentación de documento de identidad."
-        story.append(Paragraph(disclaimer, styles['Italic']))
-        
-        # Construir PDF
-        doc.build(story)
-        buffer.seek(0)
-        return buffer.getvalue()
-    
-    @staticmethod
-    def generar_constancia(evento: Dict[str, Any], egresado: Dict[str, Any]) -> bytes:
-        """
-        Genera una constancia de participación en evento.
-        
-        Args:
-            evento: Datos del evento
-            egresado: Datos del egresado
-        
-        Returns:
-            bytes: Contenido del PDF
-        """
-        buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4)
-        story = []
-        styles = getSampleStyleSheet()
-        
-        # Manejo de fechas
-        fecha_inicio = evento.get('fecha_inicio')
-        if isinstance(fecha_inicio, str):
-            try:
-                fecha_inicio = datetime.strptime(fecha_inicio, '%Y-%m-%d')
-            except ValueError:
-                fecha_inicio = datetime.now()
-        elif not isinstance(fecha_inicio, (datetime, date)):
-            fecha_inicio = datetime.now()
-        
-        # Mapeo de meses en español
-        meses = [
-            "enero", "febrero", "marzo", "abril", "mayo", "junio",
-            "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
-        ]
-        fecha_str = f"{fecha_inicio.day} de {meses[fecha_inicio.month-1]} de {fecha_inicio.year}"
-        
-        # Título
-        title_style = ParagraphStyle(
-            'Title',
-            parent=styles['Title'],
-            fontSize=28,
-            textColor=colors.HexColor('#003366'),
-            alignment=1,
-            spaceAfter=20
-        )
-        story.append(Paragraph("UNIVERSIDAD NACIONAL DE TRUJILLO", title_style))
-        
-        story.append(Spacer(1, 1*cm))
-        
-        # Subtítulo
-        subtitle_style = ParagraphStyle(
-            'Subtitle',
-            parent=styles['Heading2'],
-            fontSize=20,
-            alignment=1,
-            spaceAfter=30
-        )
-        story.append(Paragraph("CONSTANCIA DE PARTICIPACIÓN", subtitle_style))
-        
-        story.append(Spacer(1, 2*cm))
-        
-        # Texto
-        text_style = ParagraphStyle(
-            'Text',
-            parent=styles['Normal'],
-            fontSize=14,
-            alignment=1,
-            spaceAfter=20,
-            leading=20
-        )
-        
-        texto = f"""
-        Otorgada a:
-        
-        <b>{egresado.get('nombre_completo', '')}</b>
-        <b>DNI: {egresado.get('dni', '')}</b>
-        
-        Por su participación en el evento:
-        
-        <b>{evento.get('titulo', '')}</b>
-        
-        Realizado el {fecha_str}
-        """
-        
-        story.append(Paragraph(texto.replace('\n', '<br/>'), text_style))
-        
-        story.append(Spacer(1, 4*cm))
-        
-        # Firma
-        firma_style = ParagraphStyle(
-            'Firma',
-            parent=styles['Normal'],
-            fontSize=12,
-            alignment=1
-        )
-        story.append(Paragraph("_________________________", firma_style))
-        story.append(Paragraph("Director de Egresados UNT", firma_style))
-        
-        # Fecha de emisión
-        hoy = datetime.now()
-        fecha_emision = f"Trujillo, {hoy.day} de {meses[hoy.month-1]} de {hoy.year}"
-        fecha_style = ParagraphStyle(
-            'Fecha',
-            parent=styles['Normal'],
-            fontSize=10,
-            alignment=2,  # Derecha
-            spaceBefore=30
-        )
-        story.append(Paragraph(fecha_emision, fecha_style))
-        
-        doc.build(story)
-        buffer.seek(0)
-        return buffer.getvalue()
-    
-    @staticmethod
-    def generar_reporte(datos: Dict[str, Any], titulo: str) -> bytes:
-        """
-        Genera un reporte en PDF.
-        
-        Args:
-            datos: Datos del reporte
-            titulo: Título del reporte
-        
-        Returns:
-            bytes: Contenido del PDF
-        """
-        buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4)
-        story = []
-        styles = getSampleStyleSheet()
-        
-        # Título
-        title_style = ParagraphStyle(
-            'Title',
-            parent=styles['Title'],
-            fontSize=20,
-            textColor=colors.HexColor('#003366'),
-            spaceAfter=20
-        )
-        story.append(Paragraph(titulo, title_style))
-        
-        # Fecha
-        story.append(Paragraph(f"Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}", styles['Normal']))
-        story.append(Spacer(1, 1*cm))
-        
-        # Datos del reporte
-        for key, value in datos.items():
-            if isinstance(value, (list, tuple)):
-                story.append(Paragraph(f"<b>{key}:</b>", styles['Heading3']))
-                for item in value:
-                    story.append(Paragraph(f"• {item}", styles['Normal']))
-                story.append(Spacer(1, 0.5*cm))
-            elif isinstance(value, dict):
-                story.append(Paragraph(f"<b>{key}:</b>", styles['Heading3']))
-                data_table = [[k, str(v)] for k, v in value.items()]
-                table = Table(data_table, colWidths=[150, 300])
-                table.setStyle(TableStyle([
-                    ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-                    ('FONTSIZE', (0, 0), (-1, -1), 10),
-                    ('GRID', (0, 0), (-1, -1), 1, colors.grey),
-                    ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
-                ]))
-                story.append(table)
-                story.append(Spacer(1, 0.5*cm))
-            else:
-                story.append(Paragraph(f"<b>{key}:</b> {value}", styles['Normal']))
-        
-        doc.build(story)
-        buffer.seek(0)
-        return buffer.getvalue()
+def generar_pdf_bitacora(df, titulo_reporte="Reporte de Bitácora"):
+    """Genera un PDF con los registros de la bitácora en formato tabla."""
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=landscape(A4))
+    width, height = landscape(A4)
 
-# Instancia global
-pdf_generator = PDFGenerator()
+    # Título
+    c.setFont("Helvetica-Bold", 18)
+    c.drawCentredString(width/2, height - 2*cm, "UNIVERSIDAD NACIONAL DE TRUJILLO")
+    c.setFont("Helvetica-Bold", 14)
+    c.drawCentredString(width/2, height - 3*cm, titulo_reporte)
+    c.setFont("Helvetica", 10)
+    c.drawCentredString(width/2, height - 3.5*cm, f"Fecha de generación: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+
+    # Preparar datos para la tabla
+    data = [["Usuario", "Acción", "Módulo", "Descripción", "Fecha/Hora", "Resultado"]]
+    for _, row in df.iterrows():
+        # Truncar descripción si es muy larga
+        desc = str(row['Descripción'])
+        if len(desc) > 50: desc = desc[:47] + "..."
+        
+        data.append([
+            str(row['Usuario']),
+            str(row['Acción']),
+            str(row['Módulo']),
+            desc,
+            str(row['Fecha']),
+            str(row['Resultado'])
+        ])
+
+    # Estilo de tabla
+    table = Table(data, colWidths=[5*cm, 3*cm, 3*cm, 8*cm, 4*cm, 3*cm])
+    style = TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#0056b3")),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ])
+    table.setStyle(style)
+
+    # Dibujar tabla
+    table.wrapOn(c, width, height)
+    table.drawOn(c, 1*cm, height - 5*cm - (len(data)*0.5*cm)) # Ajuste simple de posición
+
+    c.showPage()
+    c.save()
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+    return pdf_bytes
+
+def generar_pdf_constancia(nombre_usuario, nombre_evento, fecha_evento):
+    """Genera un buffer de bytes con el PDF de la constancia."""
+    buffer = io.BytesIO()
+    
+    # Configurar página en horizontal
+    c = canvas.Canvas(buffer, pagesize=landscape(A4))
+    width, height = landscape(A4)
+
+    # --- Diseño de fondo / Bordes ---
+    c.setStrokeColor(colors.HexColor("#0056b3"))
+    c.setLineWidth(5)
+    c.rect(1*cm, 1*cm, width-2*cm, height-2*cm) # Borde exterior
+    
+    c.setLineWidth(1)
+    c.rect(1.2*cm, 1.2*cm, width-2.4*cm, height-2.4*cm) # Borde interior fino
+
+    # --- Encabezado ---
+    # Intentar cargar logo si existe, si no, texto
+    c.setFont("Helvetica-Bold", 24)
+    c.setFillColor(colors.HexColor("#0056b3"))
+    c.drawCentredString(width/2, height - 4*cm, "UNIVERSIDAD NACIONAL DE TRUJILLO")
+    
+    c.setFont("Helvetica", 14)
+    c.setFillColor(colors.black)
+    c.drawCentredString(width/2, height - 5*cm, "Dirección de Seguimiento del Egresado y Empleabilidad")
+
+    # --- Título Central ---
+    c.setFont("Times-BoldItalic", 48)
+    c.drawCentredString(width/2, height/2 + 2*cm, "Constancia de Participación")
+
+    # --- Cuerpo del texto ---
+    c.setFont("Helvetica", 18)
+    c.drawCentredString(width/2, height/2 - 0.5*cm, "Se otorga la presente a:")
+    
+    c.setFont("Helvetica-Bold", 26)
+    c.drawCentredString(width/2, height/2 - 2*cm, nombre_usuario.upper())
+
+    # Texto descriptivo
+    c.setFont("Helvetica", 16)
+    texto = f"Por haber participado satisfactoriamente en el evento <b>'{nombre_evento}'</b>, realizado el día {fecha_evento}."
+    
+    styles = getSampleStyleSheet()
+    style_body = ParagraphStyle(
+        'CustomBody',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=16,
+        leading=20,
+        alignment=1 # Center
+    )
+    
+    p = Paragraph(texto, style_body)
+    p.wrapOn(c, width-6*cm, 4*cm)
+    p.drawOn(c, 3*cm, height/2 - 5*cm)
+
+    # --- Firmas ---
+    c.setDash(1, 2)
+    c.line(4*cm, 4*cm, 10*cm, 4*cm)
+    c.line(width-10*cm, 4*cm, width-4*cm, 4*cm)
+    c.setDash()
+
+    c.setFont("Helvetica", 10)
+    c.drawCentredString(7*cm, 3.5*cm, "Director de Seguimiento del Egresado")
+    c.drawCentredString(width-7*cm, 3.5*cm, "Secretario Académico - UNT")
+
+    # --- Fecha de emisión ---
+    fecha_emision = datetime.now().strftime("%d de %B de %Y")
+    c.setFont("Helvetica-Oblique", 10)
+    c.drawRightString(width-2*cm, 1.5*cm, f"Emitido el: {fecha_emision}")
+
+    c.showPage()
+    c.save()
+    
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+    return pdf_bytes

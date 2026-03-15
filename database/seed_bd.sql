@@ -14,7 +14,7 @@ INSERT INTO usuarios (id, email, password_hash, rol, email_confirmado, activo) V
 (
     '11111111-1111-1111-1111-111111111111',
     'admin@unitru.edu.pe',
-    '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj2N/lJ1eGsO', -- admin123
+    '$2b$12$mz4oGy4BEI9iDs3o5vwrO.A0R9Y1H.nx9GczuRZYAW6Nm46vnqUry', -- admin123
     'administrador',
     TRUE,
     TRUE
@@ -25,7 +25,7 @@ INSERT INTO usuarios (id, email, password_hash, rol, email_confirmado, activo) V
 (
     '22222222-2222-2222-2222-222222222222',
     'juan.perez@unitru.edu.pe',
-    '$2b$12$K8m9NU6bYqF6bL7qJ8kL9eF1gH2iJ3kL4mN5oP6qR7sT8uV9wX0yZ', -- juan123
+    '$2b$12$GzyTAxacPo/ZRvTadyeyD.JkinOyFb0jQXIcE96GRT9TA8zSLPeLK', -- juan123
     'egresado',
     TRUE,
     TRUE
@@ -33,7 +33,7 @@ INSERT INTO usuarios (id, email, password_hash, rol, email_confirmado, activo) V
 (
     '33333333-3333-3333-3333-333333333333',
     'maria.lopez@unitru.edu.pe',
-    '$2b$12$M9n0OV7cZrG8hJ9kL0mN1oP2qR3sT4uV5wX6yZ7aB8cD9eF0gH1iJ', -- maria123
+    '$2b$12$iI7I9ky8y.GJ/gz16jf8UOXQZmVx1bM43KU5XcslRg0wnsGg/caAC', -- maria123
     'egresado',
     TRUE,
     TRUE
@@ -41,7 +41,7 @@ INSERT INTO usuarios (id, email, password_hash, rol, email_confirmado, activo) V
 (
     '44444444-4444-4444-4444-444444444444',
     'carlos.rodriguez@unitru.edu.pe',
-    '$2b$12$N0p1Q2rS3tU4vW5xY6zA7bC8dE9fG0hI1jK2lM3nO4pP5qQ6rR7sS8tT', -- carlos123
+    '$2b$12$vO18vjQfG3/r1HKBCRaDke/BwjsZxZ7VGPGTZ.bAqOyD3y8MD2jE2', -- carlos123
     'egresado',
     TRUE,
     TRUE
@@ -108,7 +108,7 @@ INSERT INTO usuarios (id, email, password_hash, rol, email_confirmado, activo) V
 (
     '99999999-9999-9999-9999-999999999999',
     'rrhh@techandina.com',
-    '$2b$12$O1q2r3s4t5u6v7w8x9y0zA1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8S', -- empleador123
+    '$2b$12$K.xAfE5ns1vq2yADPfLnZuE4TnFS0ugcK.s78E0tTHRLAOSB23NKG', -- empleador123
     'empleador',
     TRUE,
     TRUE
@@ -116,7 +116,7 @@ INSERT INTO usuarios (id, email, password_hash, rol, email_confirmado, activo) V
 (
     'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
     'seleccion@sanpablo.com',
-    '$2b$12$P2q3r4s5t6u7v8w9x0y1z2A3b4C5d6E7f8G9h0I1j2K3l4M5n6O7p8Q9r0S', -- empleador123
+    '$2b$12$K.xAfE5ns1vq2yADPfLnZuE4TnFS0ugcK.s78E0tTHRLAOSB23NKG', -- empleador123
     'empleador',
     TRUE,
     TRUE
@@ -286,66 +286,68 @@ INSERT INTO postulaciones (id, oferta_id, egresado_id, estado, fecha_postulacion
     CURRENT_DATE - INTERVAL '6 days'
 );
 
--- Eventos
+-- Eventos (Fechas actualizadas a 2026 para pruebas)
 INSERT INTO eventos (id, publicado_por, titulo, descripcion, tipo,
                     fecha_inicio, fecha_fin, lugar, capacidad_maxima,
                     es_gratuito, precio, activo) VALUES
 (
-    '77777777-7777-7777-7777-777777777777',
+    '99999999-9999-9999-9999-999999999999',
     '11111111-1111-1111-1111-111111111111',
-    'Feria Laboral UNT 2024',
-    'Evento presencial donde empresas de la región ofrecerán oportunidades laborales para egresados.',
+    'Seminario de Liderazgo y Empleabilidad 2026',
+    'Un evento magistral enfocado en las nuevas tendencias del mercado laboral y el desarrollo de habilidades blandas para egresados de la UNT.',
+    'webinar',
+    NOW() - INTERVAL '2 days',
+    NOW() - INTERVAL '1 day',
+    'Plataforma Zoom Institucional',
+    100,
+    TRUE,
+    NULL,
+    TRUE
+),
+(
+    '88888888-8888-8888-8888-888888888888',
+    '11111111-1111-1111-1111-111111111111',
+    'Feria Laboral de Ingeniería 2026',
+    'Conecta con las mejores empresas del sector tecnológico e industrial. Trae tu CV actualizado.',
     'feria_laboral',
-    CURRENT_DATE + INTERVAL '15 days',
-    CURRENT_DATE + INTERVAL '16 days',
-    'Coliseo UNT',
+    NOW() + INTERVAL '7 days',
+    NOW() + INTERVAL '7 days' + INTERVAL '8 hours',
+    'Coliseo Multiusos UNT',
     500,
     TRUE,
     NULL,
     TRUE
 ),
 (
-    '88888888-8888-8888-8888-888888888888',
+    '77777777-7777-7777-7777-777777777777',
     '11111111-1111-1111-1111-111111111111',
-    'Webinar: Tendencias en TI 2024',
-    'Charla virtual sobre las últimas tendencias en tecnología y cómo prepararse para el mercado laboral.',
-    'webinar',
-    CURRENT_DATE + INTERVAL '5 days',
-    CURRENT_DATE + INTERVAL '5 days',
-    'Online (Zoom)',
-    200,
-    TRUE,
-    NULL,
-    TRUE
-),
-(
-    '99999999-9999-9999-9999-999999999999',
-    '11111111-1111-1111-1111-111111111111',
-    'Curso de Especialización en Python',
-    'Curso intensivo de Python orientado a aplicaciones empresariales.',
+    'Taller: Estrategias de Networking en LinkedIn',
+    'Aprende a potenciar tu perfil profesional y generar contactos de valor en la red profesional más grande del mundo.',
     'curso',
-    CURRENT_DATE + INTERVAL '20 days',
-    CURRENT_DATE + INTERVAL '25 days',
-    'Aula Virtual UNT',
-    30,
+    NOW() - INTERVAL '1 hour',
+    NOW() + INTERVAL '2 hours',
+    'Plataforma Microsoft Teams',
+    50,
     FALSE,
-    150.00,
+    50.00,
     TRUE
 );
 
 -- Inscripciones a eventos
-INSERT INTO inscripciones_eventos (id, evento_id, usuario_id, fecha_inscripcion) VALUES
+INSERT INTO inscripciones_eventos (id, evento_id, usuario_id, fecha_inscripcion, asistio) VALUES
 (
     'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-    '88888888-8888-8888-8888-888888888888',
+    '99999999-9999-9999-9999-999999999999',
     '22222222-2222-2222-2222-222222222222',
-    CURRENT_DATE - INTERVAL '3 days'
+    NOW() - INTERVAL '3 days',
+    TRUE
 ),
 (
     'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-    '88888888-8888-8888-8888-888888888888',
-    '33333333-3333-3333-3333-333333333333',
-    CURRENT_DATE - INTERVAL '2 days'
+    '77777777-7777-7777-7777-777777777777',
+    '22222222-2222-2222-2222-222222222222',
+    NOW() - INTERVAL '2 days',
+    FALSE
 );
 
 -- Historial laboral
@@ -440,7 +442,7 @@ INSERT INTO notificaciones (id, usuario_id, tipo, asunto, mensaje, leida, fecha_
     'Nueva oferta recomendada',
     'Hay nuevas ofertas de trabajo que coinciden con tu perfil',
     FALSE,
-    CURRENT_DATE - INTERVAL '1 day'
+    NOW() - INTERVAL '1 day'
 ),
 (
     'aaaaaaaa-1111-2222-3333-444444444444',
@@ -449,18 +451,20 @@ INSERT INTO notificaciones (id, usuario_id, tipo, asunto, mensaje, leida, fecha_
     'Actualización de postulación',
     'Tu postulación a "Desarrollador Python Senior" ha pasado a estado "En revisión"',
     TRUE,
-    CURRENT_DATE - INTERVAL '2 days'
+    NOW() - INTERVAL '2 days'
 );
 
--- Pagos de ejemplo (si se requiere)
--- INSERT INTO pagos ...
+-- Chat de Eventos (Networking)
+INSERT INTO chat_eventos (evento_id, usuario_id, mensaje, fecha_envio) VALUES
+('77777777-7777-7777-7777-777777777777', '11111111-1111-1111-1111-111111111111', 'Bienvenidos al taller de LinkedIn!', NOW() - INTERVAL '45 minutes'),
+('77777777-7777-7777-7777-777777777777', '22222222-2222-2222-2222-222222222222', 'Hola! Muchas gracias por el evento.', NOW() - INTERVAL '30 minutes');
 
--- Insertar algunos registros en bitácora
+-- Insertar registros en bitácora (Auditoría)
 INSERT INTO bitacora_auditoria (usuario_id, perfil_utilizado, accion, modulo, detalle, fecha_hora) VALUES
-('11111111-1111-1111-1111-111111111111', 'administrador', 'LOGIN', 'autenticacion', 'Login exitoso', CURRENT_DATE - INTERVAL '1 day'),
-('22222222-2222-2222-2222-222222222222', 'egresado', 'LOGIN', 'autenticacion', 'Login exitoso', CURRENT_DATE - INTERVAL '12 hours'),
-('22222222-2222-2222-2222-222222222222', 'egresado', 'CREATE', 'postulaciones', 'Postulación creada: 44444444-4444-4444-4444-444444444444', CURRENT_DATE - INTERVAL '4 days'),
-('11111111-1111-1111-1111-111111111111', 'empleador', 'UPDATE', 'postulaciones', 'Postulación actualizada a estado "en_revision"', CURRENT_DATE - INTERVAL '3 days');
+('11111111-1111-1111-1111-111111111111', 'administrador', 'LOGIN', 'autenticacion', 'Login exitoso', NOW() - INTERVAL '1 day'),
+('22222222-2222-2222-2222-222222222222', 'egresado', 'LOGIN', 'autenticacion', 'Login exitoso', NOW() - INTERVAL '12 hours'),
+('22222222-2222-2222-2222-222222222222', 'egresado', 'ACCESO_MODULO', 'eventos', 'Usuario consultó el calendario de eventos', NOW() - INTERVAL '1 hour'),
+('11111111-1111-1111-1111-111111111111', 'administrador', 'CREACION', 'eventos', 'Se creó el evento: Seminario de Liderazgo', NOW() - INTERVAL '2 days');
 
 -- =====================================================
 -- FIN DEL SCRIPT DE DATOS DE PRUEBA
