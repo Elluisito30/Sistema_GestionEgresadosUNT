@@ -10,7 +10,8 @@ from src.utils.validators import (
     validar_dni, validar_email, validar_telefono,
     validar_fecha, sanitizar_entrada
 )
-from src.auth import hash_password
+from src.models.egresado import Egresado
+from src.models.user import User
 from src.utils.session import add_notification
 
 def show():
@@ -155,7 +156,7 @@ def mostrar_info_personal(user, rol):
             submitted = st.form_submit_button("Guardar Cambios", type="primary")
             
             if submitted:
-                add_notification("Perfil actualizado correctamente", "success")
+                add_notification("Cambios guardados", "success")
                 st.rerun()
 
 def mostrar_seguridad(user):
@@ -219,19 +220,9 @@ def mostrar_actividad(user):
 def obtener_datos_egresado(usuario_id):
     """Obtiene los datos del egresado desde la BD."""
     try:
-        with get_db_cursor() as cur:
-            cur.execute("""
-                SELECT e.*, u.email
-                FROM egresados e
-                JOIN usuarios u ON e.usuario_id = u.id
-                WHERE e.usuario_id = %s
-            """, (usuario_id,))
-            
-            columns = [desc[0] for desc in cur.description]
-            row = cur.fetchone()
-            
-            if row:
-                return dict(zip(columns, row))
+        eg = Egresado.get_by_usuario_id(usuario_id)
+        if eg:
+            return eg.to_dict()
     except Exception as e:
         st.error(f"Error cargando datos del egresado: {e}")
     return None
@@ -294,49 +285,38 @@ def guardar_perfil_egresado(usuario_id, nombres, ape_paterno, ape_materno,
     """Guarda los cambios en el perfil del egresado."""
     
     try:
-        with get_db_cursor(commit=True) as cur:
-            # Actualizar datos del egresado
-            cur.execute("""
-                UPDATE egresados
-                SET nombres = %s,
-                    apellido_paterno = %s,
-                    apellido_materno = %s,
-                    fecha_nacimiento = %s,
-                    telefono = %s,
-                    direccion = %s,
-                    carrera_principal = %s,
-                    facultad = %s,
-                    anio_egreso = %s,
-                    perfil_publico = %s,
-                    fecha_actualizacion = NOW()
-                WHERE usuario_id = %s
-            """, (
-                nombres, ape_paterno, ape_materno,
-                fecha_nac, telefono, direccion,
-                carrera, facultad, anio_egreso,
-                perfil_publico, usuario_id
-            ))
+        eg = Egresado.get_by_usuario_id(usuario_id)
+        if not eg:
+            add_notification("No se encontró el perfil del egresado", "error")
+            return
+
+        eg.nombres = nombres
+        eg.apellido_paterno = ape_paterno
+        eg.apellido_materno = ape_materno
+        eg.fecha_nacimiento = fecha_nac
+        eg.telefono = telefono
+        eg.direccion = direccion
+        eg.carrera_principal = carrera
+        eg.facultad = facultad
+        eg.anio_egreso = anio_egreso
+        eg.perfil_publico = perfil_publico
+        
+        # Procesar CV si se subió uno nuevo
+        if cv_file:
+            import os
+            # Crear la carpeta de storage si no existe
+            storage_dir = "storage/cv"
+            os.makedirs(storage_dir, exist_ok=True)
             
-            # Procesar CV si se subió uno nuevo
-            if cv_file:
-                import os
-                # Crear la carpeta de storage si no existe
-                storage_dir = "storage/cv"
-                os.makedirs(storage_dir, exist_ok=True)
-                
-                cv_path = f"{storage_dir}/{usuario_id}_{cv_file.name}"
-                with open(cv_path, "wb") as f:
-                    f.write(cv_file.getbuffer())
-                
-                # Guardar referencia en BD
-                cur.execute("""
-                    UPDATE egresados
-                    SET url_cv = %s
-                    WHERE usuario_id = %s
-                """, (cv_path, usuario_id))
+            cv_path = f"{storage_dir}/{usuario_id}_{cv_file.name}"
+            with open(cv_path, "wb") as f:
+                f.write(cv_file.getbuffer())
             
-            add_notification("Perfil actualizado correctamente", "success")
-            st.rerun()
+            eg.url_cv = cv_path
+            
+        eg.save()
+        add_notification("Cambios guardados", "success")
+        st.rerun()
             
     except Exception as e:
         add_notification(f"Error al guardar: {str(e)}", "error")
@@ -355,7 +335,7 @@ def guardar_perfil_empleador(usuario_id, nombres, apellidos, cargo, telefono):
                 WHERE usuario_id = %s
             """, (nombres, apellidos, cargo, telefono, usuario_id))
             
-            add_notification("Perfil actualizado correctamente", "success")
+            add_notification("Cambios guardados", "success")
             st.rerun()
             
     except Exception as e:
@@ -363,8 +343,6 @@ def guardar_perfil_empleador(usuario_id, nombres, apellidos, cargo, telefono):
 
 def cambiar_password(usuario_id, password_actual, password_nueva, password_confirmar):
     """Cambia la contraseña del usuario."""
-    
-    from src.auth import verify_password, hash_password
     
     # Validaciones
     if not password_actual or not password_nueva or not password_confirmar:
@@ -375,28 +353,31 @@ def cambiar_password(usuario_id, password_actual, password_nueva, password_confi
         add_notification("Las contraseñas nuevas no coinciden", "error")
         return
     
+    # Validación de complejidad de contraseña
     if len(password_nueva) < 8:
         add_notification("La contraseña debe tener al menos 8 caracteres", "error")
         return
     
-    # Verificar contraseña actual
-    with get_db_cursor() as cur:
-        cur.execute("SELECT password_hash FROM usuarios WHERE id = %s", (usuario_id,))
-        hash_actual = cur.fetchone()[0]
-        
-        if not verify_password(password_actual, hash_actual):
-            add_notification("La contraseña actual es incorrecta", "error")
-            return
+    import re
+    if not re.search(r"[A-Z]", password_nueva):
+        add_notification("La contraseña debe tener al menos una mayúscula", "error")
+        return
+    if not re.search(r"[0-9]", password_nueva):
+        add_notification("La contraseña debe tener al menos un número", "error")
+        return
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password_nueva):
+        add_notification("La contraseña debe tener al menos un carácter especial", "error")
+        return
     
-    # Actualizar contraseña
-    nuevo_hash = hash_password(password_nueva)
+    user = User.get_by_id(usuario_id)
+    if not user:
+        add_notification("Usuario no encontrado", "error")
+        return
+
+    success, message = user.change_password(password_actual, password_nueva)
     
-    with get_db_cursor(commit=True) as cur:
-        cur.execute("""
-            UPDATE usuarios
-            SET password_hash = %s
-            WHERE id = %s
-        """, (nuevo_hash, usuario_id))
-        
-        add_notification("Contraseña actualizada correctamente", "success")
+    if success:
+        add_notification(message, "success")
         st.rerun()
+    else:
+        add_notification(message, "error")

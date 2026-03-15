@@ -42,11 +42,21 @@ def show():
                 
                 # Contenedor estético
                 with st.container(border=True):
-                    st.dataframe(
-                        df, 
-                        use_container_width=True, 
-                        hide_index=True
-                    )
+                    # Añadir columna de acción (Ver Detalle)
+                    # Usamos st.data_editor o simplemente una lista con botones
+                    for i, row in df.iterrows():
+                        col_info, col_btn = st.columns([4, 1])
+                        with col_info:
+                            st.write(f"**{row['Nombre Completo']}** ({row['Carrera']}) - {row['Email']}")
+                        with col_btn:
+                            if st.button("👁️ Ver Detalle", key=f"btn_{row['DNI']}"):
+                                # Obtener el egresado_id real desde la base de datos usando el DNI
+                                from src.models.egresado import Egresado
+                                eg = Egresado.get_by_dni(row['DNI'])
+                                if eg:
+                                    st.session_state.detalle_egresado_id = eg.id
+                                    st.session_state.current_page = 'egresados_detalle'
+                                    st.rerun()
             else:
                 st.info("No hay egresados registrados en el sistema por el momento.")
                 

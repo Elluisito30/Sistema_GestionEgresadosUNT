@@ -103,7 +103,7 @@ class Empresa:
                 ) e
                 WHERE o.empresa_id = %s
                 GROUP BY e.id
-            ``, (self.id, self.id))
+            """, (self.id, self.id))
             
             row = cur.fetchone()
             if row:
@@ -129,7 +129,7 @@ class Empresa:
                     fecha_aprobacion = NOW(),
                     aprobado_por = %s
                 WHERE id = %s
-            ``, (admin_id, self.id))
+            """, (admin_id, self.id))
             self.estado = 'activa'
             self.fecha_aprobacion = datetime.now()
             self.aprobado_por = admin_id
@@ -145,7 +145,7 @@ class Empresa:
                 SET estado = 'rechazada',
                     aprobado_por = %s
                 WHERE id = %s
-            ``, (admin_id, self.id))
+            """, (admin_id, self.id))
             self.estado = 'rechazada'
             self.aprobado_por = admin_id
         
@@ -162,7 +162,7 @@ class Empresa:
                 FROM empleadores e
                 JOIN usuarios u ON e.usuario_id = u.id
                 WHERE e.empresa_id = %s
-            ``, (self.id,))
+            """, (self.id,))
     
     def notificar_rechazo(self, motivo):
         """Notifica a los empleadores sobre el rechazo."""
@@ -174,7 +174,7 @@ class Empresa:
                 FROM empleadores e
                 JOIN usuarios u ON e.usuario_id = u.id
                 WHERE e.empresa_id = %s
-            ``, (motivo, self.id))
+            """, (motivo, self.id))
     
     def save(self):
         """Guarda o actualiza la empresa en la base de datos."""
@@ -193,7 +193,7 @@ class Empresa:
                         sitio_web = %s,
                         logo_url = %s
                     WHERE id = %s
-                ``, (
+                """, (
                     self.ruc, self.razon_social, self.nombre_comercial,
                     self.sector_economico, self.tamano_empresa, self.direccion,
                     self.telefono_contacto, self.email_contacto, self.sitio_web,
@@ -208,7 +208,7 @@ class Empresa:
                         sitio_web, estado, logo_url
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
-                ``, (
+                """, (
                     self.ruc, self.razon_social, self.nombre_comercial,
                     self.sector_economico, self.tamano_empresa, self.direccion,
                     self.telefono_contacto, self.email_contacto, self.sitio_web,

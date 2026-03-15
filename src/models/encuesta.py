@@ -53,7 +53,7 @@ class Encuesta:
                 SELECT * FROM preguntas_encuesta
                 WHERE encuesta_id = %s
                 ORDER BY id
-            ``, (self.id,))
+            """, (self.id,))
             
             columns = [desc[0] for desc in cur.description]
             preguntas = []
@@ -94,14 +94,14 @@ class Encuesta:
                 SELECT COUNT(DISTINCT egresado_id)
                 FROM respuestas_encuesta
                 WHERE encuesta_id = %s
-            ``, (self.id,))
+            """, (self.id,))
             total_respondieron = cur.fetchone()[0] or 0
             
             # Total de preguntas
             cur.execute("""
                 SELECT COUNT(*) FROM preguntas_encuesta
                 WHERE encuesta_id = %s
-            ``, (self.id,))
+            """, (self.id,))
             total_preguntas = cur.fetchone()[0] or 0
             
             # Tasa de respuesta por pregunta
@@ -113,7 +113,7 @@ class Encuesta:
                 LEFT JOIN respuestas_encuesta r ON p.id = r.pregunta_id
                 WHERE p.encuesta_id = %s
                 GROUP BY p.id, p.texto_pregunta
-            ``, (self.id,))
+            """, (self.id,))
             
             respuestas_por_pregunta = cur.fetchall()
             
@@ -130,7 +130,7 @@ class Encuesta:
             cur.execute("""
                 SELECT COUNT(*) FROM preguntas_encuesta
                 WHERE encuesta_id = %s
-            ``, (self.id,))
+            """, (self.id,))
             total_preguntas = cur.fetchone()[0]
             
             # Respuestas del egresado
@@ -138,7 +138,7 @@ class Encuesta:
                 SELECT COUNT(DISTINCT pregunta_id)
                 FROM respuestas_encuesta
                 WHERE encuesta_id = %s AND egresado_id = %s
-            ``, (self.id, egresado_id))
+            """, (self.id, egresado_id))
             respuestas = cur.fetchone()[0]
             
             return respuestas >= total_preguntas
@@ -155,7 +155,7 @@ class Encuesta:
                     ON p.id = r.pregunta_id 
                     AND r.egresado_id = %s
                 WHERE p.encuesta_id = %s
-            ``, (egresado_id, self.id))
+            """, (egresado_id, self.id))
             
             respondidas, total = cur.fetchone()
             return {
@@ -176,7 +176,7 @@ class Encuesta:
                         fecha_fin = %s,
                         activa = %s
                     WHERE id = %s
-                ``, (
+                """, (
                     self.titulo, self.descripcion,
                     self.fecha_inicio, self.fecha_fin,
                     self.activa, self.id
@@ -188,7 +188,7 @@ class Encuesta:
                         titulo, descripcion, fecha_inicio, fecha_fin, creada_por
                     ) VALUES (%s, %s, %s, %s, %s)
                     RETURNING id
-                ``, (
+                """, (
                     self.titulo, self.descripcion,
                     self.fecha_inicio, self.fecha_fin,
                     self.creada_por

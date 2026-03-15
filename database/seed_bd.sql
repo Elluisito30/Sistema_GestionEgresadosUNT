@@ -198,7 +198,7 @@ INSERT INTO ofertas (id, empresa_id, publicado_por, titulo, descripcion, requisi
                     tipo, modalidad, ubicacion, salario_min, salario_max,
                     fecha_publicacion, fecha_limite_postulacion, activa, carrera_objetivo) VALUES
 (
-    'gggggggg-gggg-gggg-gggg-gggggggggggg',
+    '11111111-1111-1111-1111-111111111111',
     '55555555-5555-5555-5555-555555555555',
     '88888888-8888-8888-8888-888888888888',
     'Desarrollador Python Senior',
@@ -220,7 +220,7 @@ INSERT INTO ofertas (id, empresa_id, publicado_por, titulo, descripcion, requisi
     ARRAY['Ingeniería de Sistemas', 'Ingeniería Informática']
 ),
 (
-    'hhhhhhhh-hhhh-hhhh-hhhh-hhhhhhhhhhhh',
+    '22222222-2222-2222-2222-222222222222',
     '66666666-6666-6666-6666-666666666666',
     'cccccccc-cccc-cccc-cccc-cccccccccccc',
     'Asistente Administrativo',
@@ -241,7 +241,7 @@ INSERT INTO ofertas (id, empresa_id, publicado_por, titulo, descripcion, requisi
     ARRAY['Administración de Empresas', 'Contabilidad']
 ),
 (
-    'iiiiiiii-iiii-iiii-iiii-iiiiiiiiiiii',
+    '33333333-3333-3333-3333-333333333333',
     '55555555-5555-5555-5555-555555555555',
     '88888888-8888-8888-8888-888888888888',
     'Prácticas en Desarrollo Web',
@@ -265,22 +265,22 @@ INSERT INTO ofertas (id, empresa_id, publicado_por, titulo, descripcion, requisi
 -- Postulaciones
 INSERT INTO postulaciones (id, oferta_id, egresado_id, estado, fecha_postulacion) VALUES
 (
-    'jjjjjjjj-jjjj-jjjj-jjjj-jjjjjjjjjjjj',
-    'gggggggg-gggg-gggg-gggg-gggggggggggg',
+    '44444444-4444-4444-4444-444444444444',
+    '11111111-1111-1111-1111-111111111111',
     'dddddddd-dddd-dddd-dddd-dddddddddddd',
     'en_revision',
     CURRENT_DATE - INTERVAL '4 days'
 ),
 (
-    'kkkkkkkk-kkkk-kkkk-kkkk-kkkkkkkkkkkk',
-    'gggggggg-gggg-gggg-gggg-gggggggggggg',
+    '55555555-5555-5555-5555-555555555555',
+    '11111111-1111-1111-1111-111111111111',
     'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
     'recibido',
     CURRENT_DATE - INTERVAL '2 days'
 ),
 (
-    'llllllll-llll-llll-llll-llllllllllll',
-    'hhhhhhhh-hhhh-hhhh-hhhh-hhhhhhhhhhhh',
+    '66666666-6666-6666-6666-666666666666',
+    '22222222-2222-2222-2222-222222222222',
     'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
     'entrevista',
     CURRENT_DATE - INTERVAL '6 days'
@@ -291,7 +291,7 @@ INSERT INTO eventos (id, publicado_por, titulo, descripcion, tipo,
                     fecha_inicio, fecha_fin, lugar, capacidad_maxima,
                     es_gratuito, precio, activo) VALUES
 (
-    'mmmmmmmm-mmmm-mmmm-mmmm-mmmmmmmmmmmm',
+    '77777777-7777-7777-7777-777777777777',
     '11111111-1111-1111-1111-111111111111',
     'Feria Laboral UNT 2024',
     'Evento presencial donde empresas de la región ofrecerán oportunidades laborales para egresados.',
@@ -305,8 +305,8 @@ INSERT INTO eventos (id, publicado_por, titulo, descripcion, tipo,
     TRUE
 ),
 (
-    'nnnnnnnn-nnnn-nnnn-nnnn-nnnnnnnnnnnn',
     '88888888-8888-8888-8888-888888888888',
+    '11111111-1111-1111-1111-111111111111',
     'Webinar: Tendencias en TI 2024',
     'Charla virtual sobre las últimas tendencias en tecnología y cómo prepararse para el mercado laboral.',
     'webinar',
@@ -319,7 +319,7 @@ INSERT INTO eventos (id, publicado_por, titulo, descripcion, tipo,
     TRUE
 ),
 (
-    'oooooooo-oooo-oooo-oooo-oooooooooooo',
+    '99999999-9999-9999-9999-999999999999',
     '11111111-1111-1111-1111-111111111111',
     'Curso de Especialización en Python',
     'Curso intensivo de Python orientado a aplicaciones empresariales.',
@@ -336,14 +336,14 @@ INSERT INTO eventos (id, publicado_por, titulo, descripcion, tipo,
 -- Inscripciones a eventos
 INSERT INTO inscripciones_eventos (id, evento_id, usuario_id, fecha_inscripcion) VALUES
 (
-    'pppppppp-pppp-pppp-pppp-pppppppppppp',
-    'nnnnnnnn-nnnn-nnnn-nnnn-nnnnnnnnnnnn',
+    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    '88888888-8888-8888-8888-888888888888',
     '22222222-2222-2222-2222-222222222222',
     CURRENT_DATE - INTERVAL '3 days'
 ),
 (
-    'qqqqqqqq-qqqq-qqqq-qqqq-qqqqqqqqqqqq',
-    'nnnnnnnn-nnnn-nnnn-nnnn-nnnnnnnnnnnn',
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    '88888888-8888-8888-8888-888888888888',
     '33333333-3333-3333-3333-333333333333',
     CURRENT_DATE - INTERVAL '2 days'
 );
@@ -353,7 +353,7 @@ INSERT INTO historial_laboral (id, egresado_id, empresa_nombre, puesto,
                               fecha_inicio, fecha_fin, es_trabajo_actual,
                               descripcion) VALUES
 (
-    'rrrrrrrr-rrrr-rrrr-rrrr-rrrrrrrrrrrr',
+    'cccccccc-cccc-cccc-cccc-cccccccccccc',
     'dddddddd-dddd-dddd-dddd-dddddddddddd',
     'TechSolutions S.A.C.',
     'Desarrollador Junior',
@@ -363,7 +363,7 @@ INSERT INTO historial_laboral (id, egresado_id, empresa_nombre, puesto,
     'Desarrollo de aplicaciones web con Python y Django'
 ),
 (
-    'ssssssss-ssss-ssss-ssss-ssssssssssss',
+    'dddddddd-dddd-dddd-dddd-dddddddddddd',
     'dddddddd-dddd-dddd-dddd-dddddddddddd',
     'Innovación Digital S.A.C.',
     'Desarrollador Semi-Senior',
@@ -377,7 +377,7 @@ INSERT INTO historial_laboral (id, egresado_id, empresa_nombre, puesto,
 INSERT INTO educacion_continua (id, egresado_id, institucion, titulo_curso,
                                nivel, fecha_inicio, fecha_fin) VALUES
 (
-    'tttttttt-tttt-tttt-tttt-tttttttttttt',
+    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
     'dddddddd-dddd-dddd-dddd-dddddddddddd',
     'Universidad Nacional de Ingeniería',
     'Diplomado en Ciencia de Datos',
@@ -386,7 +386,7 @@ INSERT INTO educacion_continua (id, egresado_id, institucion, titulo_curso,
     '2022-07-15'
 ),
 (
-    'uuuuuuuu-uuuu-uuuu-uuuu-uuuuuuuuuuuu',
+    'ffffffff-ffff-ffff-ffff-ffffffffffff',
     'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
     'ESAN',
     'Maestría en Administración de Empresas',
@@ -398,7 +398,7 @@ INSERT INTO educacion_continua (id, egresado_id, institucion, titulo_curso,
 -- Encuestas
 INSERT INTO encuestas (id, titulo, descripcion, fecha_inicio, fecha_fin, activa, creada_por) VALUES
 (
-    'vvvvvvvv-vvvv-vvvv-vvvv-vvvvvvvvvvvv',
+    '11111111-1111-1111-1111-111111111111',
     'Encuesta de Seguimiento a Graduados 2024',
     'Encuesta para conocer la situación laboral actual de nuestros egresados.',
     CURRENT_DATE - INTERVAL '10 days',
@@ -410,22 +410,22 @@ INSERT INTO encuestas (id, titulo, descripcion, fecha_inicio, fecha_fin, activa,
 -- Preguntas de encuesta
 INSERT INTO preguntas_encuesta (id, encuesta_id, texto_pregunta, tipo_respuesta, opciones) VALUES
 (
-    'wwwwwwww-wwww-wwww-wwww-wwwwwwwwwwww',
-    'vvvvvvvv-vvvv-vvvv-vvvv-vvvvvvvvvvvv',
+    '22222222-2222-2222-2222-222222222222',
+    '11111111-1111-1111-1111-111111111111',
     '¿Cuál es su situación laboral actual?',
     'opcion_multiple',
     '["Trabajando tiempo completo", "Trabajando medio tiempo", "Buscando empleo", "Estudiando", "Independiente"]'
 ),
 (
-    'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
-    'vvvvvvvv-vvvv-vvvv-vvvv-vvvvvvvvvvvv',
+    '33333333-3333-3333-3333-333333333333',
+    '11111111-1111-1111-1111-111111111111',
     '¿Su trabajo actual está relacionado con su carrera?',
     'opcion_multiple',
     '["Sí, directamente relacionado", "Sí, parcialmente relacionado", "No está relacionado"]'
 ),
 (
-    'yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy',
-    'vvvvvvvv-vvvv-vvvv-vvvv-vvvvvvvvvvvv',
+    '44444444-4444-4444-4444-444444444444',
+    '11111111-1111-1111-1111-111111111111',
     'Rango salarial mensual (en soles)',
     'opcion_multiple',
     '["Menos de 1000", "1000 - 2000", "2001 - 3000", "3001 - 5000", "Más de 5000"]'
@@ -434,7 +434,7 @@ INSERT INTO preguntas_encuesta (id, encuesta_id, texto_pregunta, tipo_respuesta,
 -- Notificaciones
 INSERT INTO notificaciones (id, usuario_id, tipo, asunto, mensaje, leida, fecha_creacion) VALUES
 (
-    'zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz',
+    '55555555-5555-5555-5555-555555555555',
     '22222222-2222-2222-2222-222222222222',
     'sistema',
     'Nueva oferta recomendada',
@@ -459,8 +459,8 @@ INSERT INTO notificaciones (id, usuario_id, tipo, asunto, mensaje, leida, fecha_
 INSERT INTO bitacora_auditoria (usuario_id, perfil_utilizado, accion, modulo, detalle, fecha_hora) VALUES
 ('11111111-1111-1111-1111-111111111111', 'administrador', 'LOGIN', 'autenticacion', 'Login exitoso', CURRENT_DATE - INTERVAL '1 day'),
 ('22222222-2222-2222-2222-222222222222', 'egresado', 'LOGIN', 'autenticacion', 'Login exitoso', CURRENT_DATE - INTERVAL '12 hours'),
-('22222222-2222-2222-2222-222222222222', 'egresado', 'CREATE', 'postulaciones', 'Postulación creada: jjjjjjjj-jjjj-jjjj-jjjj-jjjjjjjjjjjj', CURRENT_DATE - INTERVAL '4 days'),
-('88888888-8888-8888-8888-888888888888', 'empleador', 'UPDATE', 'postulaciones', 'Postulación actualizada a estado "en_revision"', CURRENT_DATE - INTERVAL '3 days');
+('22222222-2222-2222-2222-222222222222', 'egresado', 'CREATE', 'postulaciones', 'Postulación creada: 44444444-4444-4444-4444-444444444444', CURRENT_DATE - INTERVAL '4 days'),
+('11111111-1111-1111-1111-111111111111', 'empleador', 'UPDATE', 'postulaciones', 'Postulación actualizada a estado "en_revision"', CURRENT_DATE - INTERVAL '3 days');
 
 -- =====================================================
 -- FIN DEL SCRIPT DE DATOS DE PRUEBA

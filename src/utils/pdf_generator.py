@@ -108,8 +108,22 @@ class PDFGenerator:
         story = []
         styles = getSampleStyleSheet()
         
-        # Logo UNT (simulado)
-        story.append(Spacer(1, 2*cm))
+        # Manejo de fechas
+        fecha_inicio = evento.get('fecha_inicio')
+        if isinstance(fecha_inicio, str):
+            try:
+                fecha_inicio = datetime.strptime(fecha_inicio, '%Y-%m-%d')
+            except ValueError:
+                fecha_inicio = datetime.now()
+        elif not isinstance(fecha_inicio, (datetime, date)):
+            fecha_inicio = datetime.now()
+        
+        # Mapeo de meses en español
+        meses = [
+            "enero", "febrero", "marzo", "abril", "mayo", "junio",
+            "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
+        ]
+        fecha_str = f"{fecha_inicio.day} de {meses[fecha_inicio.month-1]} de {fecha_inicio.year}"
         
         # Título
         title_style = ParagraphStyle(
@@ -156,7 +170,7 @@ class PDFGenerator:
         
         <b>{evento.get('titulo', '')}</b>
         
-        Realizado el {evento.get('fecha_inicio', '').strftime('%d de %B de %Y')}
+        Realizado el {fecha_str}
         """
         
         story.append(Paragraph(texto.replace('\n', '<br/>'), text_style))
@@ -173,7 +187,9 @@ class PDFGenerator:
         story.append(Paragraph("_________________________", firma_style))
         story.append(Paragraph("Director de Egresados UNT", firma_style))
         
-        # Fecha
+        # Fecha de emisión
+        hoy = datetime.now()
+        fecha_emision = f"Trujillo, {hoy.day} de {meses[hoy.month-1]} de {hoy.year}"
         fecha_style = ParagraphStyle(
             'Fecha',
             parent=styles['Normal'],
@@ -181,7 +197,7 @@ class PDFGenerator:
             alignment=2,  # Derecha
             spaceBefore=30
         )
-        story.append(Paragraph(f"Trujillo, {datetime.now().strftime('%d de %B de %Y')}", fecha_style))
+        story.append(Paragraph(fecha_emision, fecha_style))
         
         doc.build(story)
         buffer.seek(0)

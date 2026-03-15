@@ -1,0 +1,7 @@
+'utf-8' codec can't decode byte 0xab in position 96: invalid start byteTraceback (most recent call last):
+  File "C:\Trabajos UNT\CICLO VI EXT\SEMANA 07 LAB\Clase13 - ING.REQ\Sistema_GestionEgresadosUNT\test_pool.py", line 5, in <module>
+    psycopg2.connect(**DB_CONFIG)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "C:\Users\Asus\AppData\Local\Programs\Python\Python313\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xab in position 96: invalid start byte

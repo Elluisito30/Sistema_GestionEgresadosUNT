@@ -44,7 +44,7 @@ class Postulacion:
                 WHERE p.egresado_id = %s
                 ORDER BY p.fecha_postulacion DESC
                 LIMIT %s
-            ``, (egresado_id, limit))
+            """, (egresado_id, limit))
             
             columns = [desc[0] for desc in cur.description]
             return [dict(zip(columns, row)) for row in cur.fetchall()]
@@ -59,7 +59,7 @@ class Postulacion:
                 JOIN egresados eg ON p.egresado_id = eg.id
                 WHERE p.oferta_id = %s
                 ORDER BY p.fecha_postulacion ASC
-            ``, (oferta_id,))
+            """, (oferta_id,))
             
             columns = [desc[0] for desc in cur.description]
             return [dict(zip(columns, row)) for row in cur.fetchall()]
@@ -80,7 +80,7 @@ class Postulacion:
                     comentario_revision = COALESCE(%s, comentario_revision)
                 WHERE id = %s
                 RETURNING id
-            ``, (nuevo_estado, comentario, self.id))
+            """, (nuevo_estado, comentario, self.id))
             
             if cur.fetchone():
                 self.estado = nuevo_estado
@@ -106,7 +106,7 @@ class Postulacion:
                 JOIN usuarios u ON e.usuario_id = u.id
                 JOIN ofertas o ON p.oferta_id = o.id
                 WHERE p.id = %s
-            ``, (self.id,))
+            """, (self.id,))
             
             usuario_id, oferta_titulo = cur.fetchone()
             
@@ -115,7 +115,7 @@ class Postulacion:
                 INSERT INTO notificaciones (usuario_id, tipo, asunto, mensaje)
                 VALUES (%s, 'sistema', 'Estado de postulación actualizado',
                         'Tu postulación a "' || %s || '" ha cambiado a: ' || %s)
-            ``, (usuario_id, oferta_titulo, self.estado))
+            """, (usuario_id, oferta_titulo, self.estado))
     
     def get_dias_en_estado(self):
         """Obtiene los días que lleva en el estado actual."""
@@ -133,7 +133,7 @@ class Postulacion:
                         cv_usado_url = %s,
                         comentario_revision = %s
                     WHERE id = %s
-                ``, (self.estado, self.cv_usado_url, self.comentario_revision, self.id))
+                """, (self.estado, self.cv_usado_url, self.comentario_revision, self.id))
         else:
             with get_db_cursor(commit=True) as cur:
                 cur.execute("""
@@ -141,7 +141,7 @@ class Postulacion:
                         oferta_id, egresado_id, cv_usado_url
                     ) VALUES (%s, %s, %s)
                     RETURNING id
-                ``, (self.oferta_id, self.egresado_id, self.cv_usado_url))
+                """, (self.oferta_id, self.egresado_id, self.cv_usado_url))
                 self.id = cur.fetchone()[0]
         
         return self.id

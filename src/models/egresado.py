@@ -52,7 +52,14 @@ class Egresado:
     def get_by_usuario_id(cls, usuario_id):
         """Obtiene un egresado por ID de usuario."""
         with get_db_cursor() as cur:
-            cur.execute("SELECT * FROM egresados WHERE usuario_id = %s", (usuario_id,))
+            cur.execute("""
+                SELECT id, usuario_id, nombres, apellido_paterno, apellido_materno,
+                       dni, fecha_nacimiento, telefono, direccion, carrera_principal,
+                       facultad, anio_egreso, url_cv, perfil_publico, foto_perfil_url,
+                       fecha_actualizacion
+                FROM egresados 
+                WHERE usuario_id = %s
+            """, (usuario_id,))
             row = cur.fetchone()
             
             if row:
@@ -63,7 +70,14 @@ class Egresado:
     def get_by_id(cls, egresado_id):
         """Obtiene un egresado por su ID."""
         with get_db_cursor() as cur:
-            cur.execute("SELECT * FROM egresados WHERE id = %s", (egresado_id,))
+            cur.execute("""
+                SELECT id, usuario_id, nombres, apellido_paterno, apellido_materno,
+                       dni, fecha_nacimiento, telefono, direccion, carrera_principal,
+                       facultad, anio_egreso, url_cv, perfil_publico, foto_perfil_url,
+                       fecha_actualizacion
+                FROM egresados 
+                WHERE id = %s
+            """, (egresado_id,))
             row = cur.fetchone()
             
             if row:
@@ -74,7 +88,14 @@ class Egresado:
     def get_by_dni(cls, dni):
         """Obtiene un egresado por su DNI."""
         with get_db_cursor() as cur:
-            cur.execute("SELECT * FROM egresados WHERE dni = %s", (dni,))
+            cur.execute("""
+                SELECT id, usuario_id, nombres, apellido_paterno, apellido_materno,
+                       dni, fecha_nacimiento, telefono, direccion, carrera_principal,
+                       facultad, anio_egreso, url_cv, perfil_publico, foto_perfil_url,
+                       fecha_actualizacion
+                FROM egresados 
+                WHERE dni = %s
+            """, (dni,))
             row = cur.fetchone()
             
             if row:

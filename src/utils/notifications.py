@@ -27,7 +27,7 @@ class NotificationSystem:
                 INSERT INTO notificaciones (usuario_id, tipo, asunto, mensaje, metadata)
                 VALUES (%s, %s, %s, %s, %s)
                 RETURNING id
-            ``, (usuario_id, tipo, asunto, mensaje, metadata))
+            """, (usuario_id, tipo, asunto, mensaje, metadata))
             
             notificacion_id = cur.fetchone()[0]
             
@@ -53,7 +53,7 @@ class NotificationSystem:
                     INSERT INTO notificaciones (usuario_id, tipo, asunto, mensaje, metadata)
                     VALUES (%s, %s, %s, %s, %s)
                     RETURNING id
-                ``, (usuario_id, tipo, asunto, mensaje, metadata))
+                """, (usuario_id, tipo, asunto, mensaje, metadata))
                 
                 notificaciones.append(cur.fetchone()[0])
         
@@ -91,7 +91,7 @@ class NotificationSystem:
                 UPDATE notificaciones
                 SET leida = true
                 WHERE id = %s
-            ``, (notificacion_id,))
+            """, (notificacion_id,))
     
     @staticmethod
     def mark_all_as_read(usuario_id: str):
@@ -101,7 +101,7 @@ class NotificationSystem:
                 UPDATE notificaciones
                 SET leida = true
                 WHERE usuario_id = %s AND leida = false
-            ``, (usuario_id,))
+            """, (usuario_id,))
     
     @staticmethod
     def delete_notification(notificacion_id: str):
@@ -116,7 +116,7 @@ class NotificationSystem:
             cur.execute("""
                 SELECT COUNT(*) FROM notificaciones
                 WHERE usuario_id = %s AND leida = false
-            ``, (usuario_id,))
+            """, (usuario_id,))
             return cur.fetchone()[0]
     
     @staticmethod
@@ -157,7 +157,7 @@ class NotificationSystem:
                 JOIN usuarios u ON e.usuario_id = u.id
                 JOIN ofertas o ON p.oferta_id = o.id
                 WHERE p.id = %s
-            ``, (postulacion_id,))
+            """, (postulacion_id,))
             
             usuario_id, oferta_titulo = cur.fetchone()
         
@@ -214,7 +214,7 @@ class NotificationSystem:
                 JOIN usuarios u ON em.usuario_id = u.id
                 JOIN empresas e ON em.empresa_id = e.id
                 WHERE em.empresa_id = %s
-            ``, (empresa_id,))
+            """, (empresa_id,))
             
             resultados = cur.fetchall()
             razon_social = resultados[0][1] if resultados else "tu empresa"

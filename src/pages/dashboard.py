@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import importlib
+from src.models.egresado import Egresado
 from src.auth import logout_usuario
 from src.utils.database import get_db_cursor, get_db_connection
 
@@ -30,8 +31,9 @@ def get_admin_metrics():
 @st.cache_data(ttl=120)
 def get_egresados_por_mes():
     try:
-        df_egresados_mes = pd.read_sql("SELECT * FROM v_egresados_por_mes LIMIT 12", con=get_db_connection().__enter__())
-        return df_egresados_mes
+        with get_db_connection() as conn:
+            df_egresados_mes = pd.read_sql("SELECT * FROM v_egresados_por_mes LIMIT 12", con=conn)
+            return df_egresados_mes
     except Exception as e:
         return None
 
@@ -52,34 +54,14 @@ def get_employer_metrics(empresa_id):
         return None, None, None
 
 def get_perfil_completitud(usuario_id):
-    """Calcula el % de completitud del perfil del egresado comprobando campos clave."""
+    """Calcula el % de completitud del perfil del egresado usando el modelo."""
     try:
-        with get_db_cursor() as cur:
-            cur.execute("""
-                SELECT telefono, direccion, url_cv, foto_perfil_url, linkedin_url 
-                FROM egresados 
-                WHERE usuario_id = %s
-            """, (usuario_id,))
-            row = cur.fetchone()
-            if not row:
-                return 0.20 # Base 20% si solo usuario fue creado
-            campos = len(row)
-            completados = sum(1 for item in row if item is not None and str(item).strip() != '')
-            # Damos 50% por datos basicos como nombres/DNI (que son obligatorios), 
-            # y el resto depende de estos campos extra
-            return 0.50 + (0.50 * (completados / campos))
+        eg = Egresado.get_by_usuario_id(usuario_id)
+        if eg:
+            return eg.calcular_completitud_perfil() / 100
+        return 0.20 # Base 20% si solo usuario fue creado
     except Exception:
-        # Falla SQL silenciosa por columna nueva
-        try:
-             with get_db_cursor() as cur:
-                cur.execute("SELECT telefono, direccion, url_cv, foto_perfil_url FROM egresados WHERE usuario_id = %s", (usuario_id,))
-                row = cur.fetchone()
-                if not row: return 0.20
-                campos = len(row)
-                completados = sum(1 for item in row if item is not None and str(item).strip() != '')
-                return 0.50 + (0.50 * (completados / campos))
-        except Exception:
-             return 0.0
+        return 0.0
 
 def get_ofertas_recomendadas(usuario_id, limit=3):
     """Obtiene ofertas sugeridas basadas en la carrera del egresado."""

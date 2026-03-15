@@ -1,9 +1,8 @@
 import streamlit as st
 from src.auth import login_usuario, logout_usuario, validar_correo_unt
-from src.utils.session import init_session_state
+from src.utils.session import init_session_state, render_notifications
 from src.pages import dashboard
 
-# Configuración de la página (debe ser el primer comando de Streamlit)
 st.set_page_config(
     page_title="Sistema de Egresados UNT",
     page_icon="🎓",
@@ -11,10 +10,9 @@ st.set_page_config(
     initial_sidebar_state="auto"
 )
 
-# Inicializar el estado de la sesión
 init_session_state()
+render_notifications()
 
-# CSS Personalizado para un diseño más limpio
 st.markdown("""
     <style>
     [data-testid="stForm"] {
@@ -37,10 +35,12 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Lógica de Login / Router
 if not st.session_state.get('authenticated', False):
-    # --- PANTALLA DE LOGIN ---
-    st.title("🎓 Sistema de Gestión de Egresados y Oferta Laboral - UNT")
+    # Título centrado
+    st.markdown(
+        "<h1 style='text-align: center;'>🎓 Sistema de Gestión de Egresados y Oferta Laboral - UNT</h1>",
+        unsafe_allow_html=True
+    )
     st.markdown("---")
 
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -64,16 +64,15 @@ if not st.session_state.get('authenticated', False):
                         st.error(error)
 
         st.markdown("<br>", unsafe_allow_html=True)
-        # Enlaces para recuperar contraseña o registrarse (a implementar)
-        col_a, col_b = st.columns(2)
+
+        # Botón izquierdo + espacio + botón derecho alineado al extremo
+        col_a, col_space, col_b = st.columns([1.2, 0.8, 1])
         with col_a:
-            if st.button("Registrarse como Egresado"):
+            if st.button("Registrarse como Egresado", use_container_width=True):
                 st.info("Funcionalidad de registro próximamente.")
         with col_b:
-            if st.button("¿Olvidó su contraseña?"):
+            if st.button("¿Olvidó su contraseña?", use_container_width=True):
                 st.info("Funcionalidad de recuperación próximamente.")
 
 else:
-    # --- USUARIO AUTENTICADO ---
-    # El router: muestra el dashboard y la barra lateral con el menú contextual
     dashboard.show()

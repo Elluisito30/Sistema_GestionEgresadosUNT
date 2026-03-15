@@ -82,7 +82,7 @@ class Empleador:
                 WHERE publicado_por = %s
                 ORDER BY fecha_publicacion DESC
                 LIMIT %s
-            ``, (self.id, limit))
+            """, (self.id, limit))
             
             return [Oferta.get_by_id(row[0]) for row in cur.fetchall()]
     
@@ -96,7 +96,7 @@ class Empleador:
                 WHERE o.publicado_por = %s
                 AND p.estado = 'recibido'
                 ORDER BY p.fecha_postulacion ASC
-            ``, (self.id,))
+            """, (self.id,))
             
             from .postulacion import Postulacion
             columns = [desc[0] for desc in cur.description]
@@ -118,7 +118,7 @@ class Empleador:
                         telefono = %s,
                         es_administrador_empresa = %s
                     WHERE id = %s
-                ``, (
+                """, (
                     self.nombres, self.apellidos, self.cargo,
                     self.telefono, self.es_administrador_empresa, self.id
                 ))
@@ -130,7 +130,7 @@ class Empleador:
                         cargo, telefono, es_administrador_empresa
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
-                ``, (
+                """, (
                     self.usuario_id, self.empresa_id, self.nombres,
                     self.apellidos, self.cargo, self.telefono,
                     self.es_administrador_empresa

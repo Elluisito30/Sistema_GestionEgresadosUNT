@@ -87,7 +87,10 @@ CREATE TABLE empleadores (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     usuario_id UUID UNIQUE NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
     empresa_id UUID NOT NULL REFERENCES empresas(id) ON DELETE CASCADE,
-    cargo_en_empresa VARCHAR(100) NOT NULL,
+    nombres VARCHAR(255) NOT NULL,
+    apellidos VARCHAR(255) NOT NULL,
+    cargo VARCHAR(100) NOT NULL,
+    telefono VARCHAR(20),
     es_administrador_empresa BOOLEAN DEFAULT FALSE -- Si puede gestionar otros usuarios de la misma empresa
 );
 

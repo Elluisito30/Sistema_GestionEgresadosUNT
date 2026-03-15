@@ -51,7 +51,7 @@ class Oferta:
                 AND fecha_limite_postulacion >= CURRENT_DATE
                 ORDER BY fecha_publicacion DESC
                 LIMIT %s
-            ``, (limit,))
+            """, (limit,))
             
             columns = [desc[0] for desc in cur.description]
             return [cls(*row) for row in cur.fetchall()]
@@ -102,7 +102,7 @@ class Oferta:
                     COUNT(*) FILTER (WHERE estado = 'descartado') as descartados
                 FROM postulaciones
                 WHERE oferta_id = %s
-            ``, (self.id,))
+            """, (self.id,))
             
             row = cur.fetchone()
             if row:
@@ -151,7 +151,7 @@ class Oferta:
                         activa = %s,
                         carrera_objetivo = %s
                     WHERE id = %s
-                ``, (
+                """, (
                     self.titulo, self.descripcion, self.requisitos,
                     self.tipo, self.modalidad, self.ubicacion,
                     self.salario_min, self.salario_max,
@@ -168,7 +168,7 @@ class Oferta:
                         carrera_objetivo
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
-                ``, (
+                """, (
                     self.empresa_id, self.publicado_por, self.titulo,
                     self.descripcion, self.requisitos, self.tipo,
                     self.modalidad, self.ubicacion, self.salario_min,

@@ -187,4 +187,53 @@ def mostrar_tarjeta_oferta(oferta):
             badges = []
             badges.append(f"📍 {oferta['modalidad'].capitalize()}")
             badges.append(f"📋 {oferta['tipo'].capitalize()}")
-            if oferta['salario_min'] and oferta
+            
+            if oferta['salario_min'] and oferta['salario_max']:
+                badges.append(f"💰 S/ {oferta['salario_min']} - {oferta['salario_max']}")
+            elif oferta['salario_min']:
+                badges.append(f"💰 Desde S/ {oferta['salario_min']}")
+            
+            st.write(" | ".join(badges))
+            st.write(f"{oferta['descripcion'][:150]}...")
+            st.caption(f"Publicado: {oferta['fecha_publicacion'].strftime('%d/%m/%Y')} | Límite: {oferta['fecha_limite_postulacion'].strftime('%d/%m/%Y')}")
+
+        with col3:
+            st.write("") # Espaciador
+            if oferta['ya_postulado']:
+                st.success("✅ Ya postulado")
+                if st.button("Ver Seguimiento", key=f"seg_{oferta['id']}"):
+                    st.session_state.current_page = "postulaciones_seguimiento"
+                    st.rerun()
+            else:
+                if st.button("Postular Ahora", key=f"post_{oferta['id']}", type="primary"):
+                    postular_a_oferta(oferta['id'])
+        
+        st.markdown("---")
+
+def postular_a_oferta(oferta_id):
+    """Registra la postulación del egresado a una oferta."""
+    
+    usuario_id = st.session_state.user['id']
+    
+    try:
+        with get_db_cursor(commit=True) as cur:
+            # Obtener el ID del egresado
+            cur.execute("SELECT id FROM egresados WHERE usuario_id = %s", (usuario_id,))
+            res = cur.fetchone()
+            if not res:
+                add_notification("Error: No se encontró perfil de egresado.", "error")
+                return
+            
+            egresado_id = res[0]
+            
+            # Insertar postulación
+            cur.execute("""
+                INSERT INTO postulaciones (oferta_id, egresado_id, fecha_postulacion, estado)
+                VALUES (%s, %s, NOW(), 'recibido')
+            """, (oferta_id, egresado_id))
+            
+            add_notification("¡Postulación enviada con éxito!", "success")
+            st.rerun()
+            
+    except Exception as e:
+        add_notification(f"Error al postular: {str(e)}", "error")

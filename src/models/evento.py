@@ -48,7 +48,7 @@ class Evento:
                 AND fecha_inicio > NOW()
                 ORDER BY fecha_inicio ASC
                 LIMIT %s
-            ``, (limit,))
+            """, (limit,))
             
             columns = [desc[0] for desc in cur.description]
             return [cls(*row) for row in cur.fetchall()]
@@ -70,7 +70,7 @@ class Evento:
                 LEFT JOIN egresados e ON u.id = e.usuario_id
                 WHERE i.evento_id = %s
                 ORDER BY i.fecha_inscripcion DESC
-            ``, (self.id,))
+            """, (self.id,))
             
             columns = [desc[0] for desc in cur.description]
             return [dict(zip(columns, row)) for row in cur.fetchall()]
@@ -81,7 +81,7 @@ class Evento:
             cur.execute("""
                 SELECT COUNT(*) FROM inscripciones_eventos
                 WHERE evento_id = %s
-            ``, (self.id,))
+            """, (self.id,))
             return cur.fetchone()[0]
     
     def cupo_disponible(self):
@@ -107,7 +107,7 @@ class Evento:
             cur.execute("""
                 SELECT id FROM inscripciones_eventos
                 WHERE evento_id = %s AND usuario_id = %s
-            ``, (self.id, usuario_id))
+            """, (self.id, usuario_id))
             
             if cur.fetchone():
                 return False, "Ya estás inscrito en este evento"
@@ -117,7 +117,7 @@ class Evento:
                 INSERT INTO inscripciones_eventos (evento_id, usuario_id, pago_id)
                 VALUES (%s, %s, %s)
                 RETURNING id
-            ``, (self.id, usuario_id, pago_id))
+            """, (self.id, usuario_id, pago_id))
             
             return True, "Inscripción exitosa"
     
@@ -128,7 +128,7 @@ class Evento:
                 UPDATE inscripciones_eventos
                 SET asistio = %s
                 WHERE evento_id = %s AND usuario_id = %s
-            ``, (asistio, self.id, usuario_id))
+            """, (asistio, self.id, usuario_id))
     
     def save(self):
         """Guarda o actualiza el evento en la base de datos."""
@@ -148,7 +148,7 @@ class Evento:
                         imagen_promocional_url = %s,
                         activo = %s
                     WHERE id = %s
-                ``, (
+                """, (
                     self.titulo, self.descripcion, self.tipo,
                     self.fecha_inicio, self.fecha_fin, self.lugar,
                     self.capacidad_maxima, self.es_gratuito, self.precio,
@@ -163,7 +163,7 @@ class Evento:
                         es_gratuito, precio, imagen_promocional_url, activo
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
-                ``, (
+                """, (
                     self.publicado_por, self.titulo, self.descripcion, self.tipo,
                     self.fecha_inicio, self.fecha_fin, self.lugar,
                     self.capacidad_maxima, self.es_gratuito, self.precio,

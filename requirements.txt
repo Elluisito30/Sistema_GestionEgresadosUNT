@@ -5,5 +5,7 @@ plotly
 python-dotenv
 bcrypt
 email-validator
-qrcode[pil]  # Para generar QR
-reportlab    # Para generar PDFs de vouchers
+qrcode[pil]
+reportlab
+pytest
+pytest-mock

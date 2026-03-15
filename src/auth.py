@@ -53,12 +53,13 @@ def login_usuario(email, password):
 def registrar_en_bitacora(usuario_id, perfil, accion, modulo, detalle):
     """Función helper para registrar acciones en la bitácora."""
     try:
+        ip_adress = st.query_params.get('ip', None)
         with get_db_cursor(commit=True) as cur:
             cur.execute("""
                 INSERT INTO bitacora_auditoria
                 (usuario_id, perfil_utilizado, accion, modulo, detalle, direccion_ip)
                 VALUES (%s, %s, %s, %s, %s, %s)
-            """, (usuario_id, perfil, accion, modulo, detalle, st.query_params.get('ip', 'desconocida')))
+            """, (usuario_id, perfil, accion, modulo, detalle, ip_adress))
     except Exception as e:
         # No detener la app si falla la bitácora, solo loguear
         print(f"Error al registrar en bitácora: {e}")

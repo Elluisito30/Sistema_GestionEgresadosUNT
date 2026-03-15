@@ -101,6 +101,21 @@ def clear_notifications():
     """Limpia todas las notificaciones de la sesión."""
     st.session_state.notifications = []
 
+def render_notifications():
+    """Renderiza las notificaciones pendientes en la UI."""
+    if 'notifications' in st.session_state and st.session_state.notifications:
+        for notif in st.session_state.notifications:
+            if notif['type'] == 'success':
+                st.success(notif['message'])
+            elif notif['type'] == 'error':
+                st.error(notif['message'])
+            elif notif['type'] == 'warning':
+                st.warning(notif['message'])
+            else:
+                st.info(notif['message'])
+        # Limpiar notificaciones después de mostrarlas
+        clear_notifications()
+
 def save_form_data(key, data):
     """
     Guarda datos de formulario en la sesión.

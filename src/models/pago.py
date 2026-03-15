@@ -47,7 +47,7 @@ class Pago:
                 WHERE usuario_id = %s
                 ORDER BY fecha_pago DESC
                 LIMIT %s
-            ``, (usuario_id, limit))
+            """, (usuario_id, limit))
             
             columns = [desc[0] for desc in cur.description]
             return [cls(*row) for row in cur.fetchall()]
@@ -79,7 +79,7 @@ class Pago:
                     codigo_voucher, qr_code_data, pagado
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
-            ``, (usuario_id, concepto, referencia_id, monto,
+            """, (usuario_id, concepto, referencia_id, monto,
                  codigo_voucher, qr_data, True))
             
             pago_id = cur.fetchone()[0]
@@ -109,7 +109,7 @@ class Pago:
                 SET validado = true
                 WHERE id = %s
                 RETURNING id
-            ``, (self.id,))
+            """, (self.id,))
             
             if cur.fetchone():
                 self.validado = True
@@ -139,7 +139,7 @@ class Pago:
                         validado = %s,
                         pdf_voucher_url = %s
                     WHERE id = %s
-                ``, (self.pagado, self.validado, self.pdf_voucher_url, self.id))
+                """, (self.pagado, self.validado, self.pdf_voucher_url, self.id))
         else:
             with get_db_cursor(commit=True) as cur:
                 cur.execute("""
@@ -148,7 +148,7 @@ class Pago:
                         codigo_voucher, qr_code_data, pagado
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
-                ``, (
+                """, (
                     self.usuario_id, self.concepto, self.referencia_id,
                     self.monto, self.codigo_voucher, self.qr_code_data,
                     self.pagado
