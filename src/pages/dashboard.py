@@ -199,15 +199,23 @@ def render_empleador_dashboard(user):
 
 def load_page(page_name):
     """Carga dinámicamente el módulo desde src.pages."""
+    module_name = f"src.pages.{page_name}"
     try:
-        module_name = f"src.pages.{page_name}"
         module = importlib.import_module(module_name)
         if hasattr(module, 'show'):
             module.show()
         else:
             st.warning(f"La página '{page_name}' no provee una función 'show()'.")
-    except ModuleNotFoundError:
-        st.info(f"Página en construcción: {page_name}")
+    except ModuleNotFoundError as e:
+        if getattr(e, "name", None) == module_name:
+            st.info(f"Página en construcción: {page_name}")
+        else:
+            st.error(
+                f"No se pudo cargar la página '{page_name}' por una dependencia faltante: {getattr(e, 'name', 'desconocida')}. "
+                "Ejecuta 'pip install -r requirements.txt'."
+            )
+    except Exception as e:
+        st.error(f"Error al cargar la página '{page_name}': {str(e)}")
 
 def show():
     user = st.session_state.user

@@ -15,6 +15,13 @@ from openpyxl.styles import (
 from openpyxl.utils import get_column_letter
 
 
+def _strip_tz(value):
+    """Quita la zona horaria de un datetime/time para compatibilidad con openpyxl."""
+    if hasattr(value, "tzinfo") and value.tzinfo is not None:
+        return value.replace(tzinfo=None)
+    return value
+
+
 def _create_header_style(ws, titulo, subtitulo=""):
     """Agrega encabezado profesional al worksheet."""
     ws.merge_cells("A1:H1")
@@ -126,7 +133,7 @@ def generar_excel_pagos(pagos_data):
         ws.cell(row=row, column=2).value = pago.get("email", "")
         ws.cell(row=row, column=3).value = str(pago.get("concepto", "")).upper()
         ws.cell(row=row, column=4).value = float(pago.get("monto", 0))
-        ws.cell(row=row, column=5).value = pago.get("fecha_pago")
+        ws.cell(row=row, column=5).value = _strip_tz(pago.get("fecha_pago"))
         ws.cell(row=row, column=6).value = "Sí" if pago.get("pagado") else "No"
         ws.cell(row=row, column=7).value = "Sí" if pago.get("validado") else "No"
 
@@ -210,7 +217,7 @@ def generar_excel_resultados_busqueda(resultados_data, titulo_reporte="REPORTE D
         for col_idx, col_name in enumerate(columns, 1):
             value = item.get(col_name) if isinstance(item, dict) else item[col_idx - 1]
             cell = ws.cell(row=row, column=col_idx)
-            cell.value = value
+            cell.value = _strip_tz(value)
 
     _apply_table_style(ws, data_start_row, row, len(columns))
     _adjust_column_widths(ws, len(columns))

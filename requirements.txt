@@ -7,5 +7,6 @@ bcrypt
 email-validator
 qrcode[pil]
 reportlab
+openpyxl
 pytest
 pytest-mock
