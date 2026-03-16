@@ -239,7 +239,7 @@ def show():
                 "🏠 Dashboard Principal": "dashboard",
                 "👥 Egresados": "egresados_lista",
                 "🏢 Empresas": "empresas_lista",
-                "💼 Ofertas": "ofertas_gestionar",
+                "💼 Ofertas": "ofertas_admin",
                 "📅 Eventos": "eventos_gestionar",
                 "💰 Pagos": "pagos_admin",
                 "📊 Reportes": "reportes_dashboard",

@@ -1,12 +1,10 @@
-"""
-Módulo de gestión de empresas para administradores.
-Permite ver, aprobar y gestionar empresas registradas.
-"""
 import streamlit as st
 import pandas as pd
 from datetime import datetime
 from src.utils.database import get_db_cursor
-from src.utils.session import add_notification
+from src.utils.session import render_notifications, add_notification
+from src.models.empresa import Empresa
+from src.utils.pdf_generator import generar_pdf_empresas_seleccionadas
 
 def show():
     """Muestra la página de gestión de empresas."""
@@ -14,10 +12,12 @@ def show():
     st.title("🏢 Gestión de Empresas")
     
     # Tabs para diferentes vistas
-    tab1, tab2, tab3 = st.tabs([
+    tab1, tab2, tab3, tab4 = st.tabs([
         "📋 Pendientes de Aprobación",
-        "✅ Empresas Activas",
+        "🏢 Directorio / Filtros",
         "📊 Estadísticas"
+        ,
+        "➕ Crear Empresa"
     ])
     
     with tab1:
@@ -29,395 +29,387 @@ def show():
     with tab3:
         mostrar_estadisticas_empresas()
 
+    with tab4:
+        crear_empresa_admin()
+
 def mostrar_empresas_pendientes():
     """Muestra las empresas pendientes de aprobación."""
+    st.subheader("Empresas Esperando Validación")
     
-    st.subheader("Empresas Pendientes de Aprobación")
+    # Usar el método del modelo
+    empresas = Empresa.get_pendientes()
     
-    with get_db_cursor() as cur:
-        cur.execute("""
-            SELECT 
-                e.id,
-                e.ruc,
-                e.razon_social,
-                e.nombre_comercial,
-                e.sector_economico,
-                e.tamano_empresa,
-                e.email_contacto,
-                e.telefono_contacto,
-                e.fecha_registro,
-                COUNT(o.id) as total_ofertas
-            FROM empresas e
-            LEFT JOIN ofertas o ON e.id = o.empresa_id
-            WHERE e.estado = 'pendiente'
-            GROUP BY e.id
-            ORDER BY e.fecha_registro ASC
-        """)
-        
-        empresas = cur.fetchall()
-        
-        if not empresas:
-            st.success("No hay empresas pendientes de aprobación.")
-            return
-        
-        for empresa in empresas:
-            with st.container():
-                col1, col2, col3 = st.columns([3, 1, 1])
+    if not empresas:
+        st.info("No hay solicitudes de registro pendientes.")
+        return
+    
+    for empresa in empresas:
+        with st.container(border=True):
+            col1, col2, col3 = st.columns([3, 1, 1])
+            
+            with col1:
+                st.markdown(f"### {empresa.razon_social}")
+                st.markdown(f"**RUC:** `{empresa.ruc}` | **Sector:** {empresa.sector_economico}")
+                st.markdown(f"**Email:** {empresa.email_contacto} | **Tel:** {empresa.telefono_contacto}")
+                st.caption(f"Registrada el: {empresa.fecha_registro.strftime('%d/%m/%Y %H:%M')}")
+            
+            with col2:
+                # Mostrar estadísticas rápidas si existen
+                stats = empresa.get_estadisticas()
+                st.metric("Empleadores", stats['total_empleadores'])
+            
+            with col3:
+                # Botones de acción
+                if st.button("✅ Aprobar", key=f"apr_{empresa.id}", use_container_width=True):
+                    aprobar_empresa_action(empresa)
                 
-                with col1:
-                    st.markdown(f"### {empresa[2]}")
-                    st.markdown(f"**RUC:** {empresa[1]} | **Sector:** {empresa[4]}")
-                    st.markdown(f"**Contacto:** {empresa[6]} | {empresa[7]}")
-                    st.markdown(f"**Registro:** {empresa[8].strftime('%d/%m/%Y')}")
-                
-                with col2:
-                    st.metric("Ofertas", empresa[9])
-                
-                with col3:
-                    if st.button("✅ Aprobar", key=f"apr_{empresa[0]}", use_container_width=True):
-                        aprobar_empresa(empresa[0])
-                    if st.button("❌ Rechazar", key=f"rej_{empresa[0]}", use_container_width=True):
-                        rechazar_empresa(empresa[0])
-                
-                with st.expander("Ver detalles completos"):
-                    mostrar_detalles_empresa(empresa[0])
-                
-                st.markdown("---")
+                # Botón de rechazo con popover para el motivo
+                with st.popover("❌ Rechazar", use_container_width=True):
+                    motivo = st.text_area("Motivo del rechazo", placeholder="Explique por qué se rechaza...")
+                    if st.button("Confirmar Rechazo", key=f"conf_rej_{empresa.id}"):
+                        if motivo:
+                            rechazar_empresa_action(empresa, motivo)
+                        else:
+                            st.error("Debe indicar un motivo.")
 
 def mostrar_empresas_activas():
-    """Muestra las empresas activas en el sistema."""
-    
-    st.subheader("Empresas Activas")
+    """Muestra el directorio con filtros (admin)."""
+    st.subheader("Directorio de Empresas")
     
     # Filtros de búsqueda
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
-        busqueda = st.text_input("🔍 Buscar por RUC o Razón Social", placeholder="Ingrese término...")
+        termino = st.text_input("🔍 Buscar", placeholder="Nombre, RUC o Sector...")
     with col2:
-        sector = st.selectbox(
-            "Sector Económico",
-            options=['Todos', 'Tecnología', 'Salud', 'Educación', 'Finanzas', 'Construcción', 'Otros']
-        )
-    
+        estado = st.selectbox("Estado", options=["activa", "pendiente", "rechazada"], index=0)
+    with col3:
+        # Sector económico desde BD (activos)
+        with get_db_cursor() as cur:
+            cur.execute("SELECT DISTINCT sector_economico FROM empresas WHERE sector_economico IS NOT NULL ORDER BY sector_economico")
+            sectores = [r[0] for r in cur.fetchall()]
+        sector = st.selectbox("Sector", options=["Todos"] + sectores, index=0)
+
+    # Query directa para soportar filtro por estado/sector sin cambiar modelos
     query = """
-        SELECT 
-            e.id,
-            e.ruc,
-            e.razon_social,
-            e.sector_economico,
-            e.tamano_empresa,
-            e.email_contacto,
-            e.telefono_contacto,
-            e.fecha_aprobacion,
-            COUNT(DISTINCT em.id) as total_empleadores,
-            COUNT(DISTINCT o.id) as total_ofertas
-        FROM empresas e
-        LEFT JOIN empleadores em ON e.id = em.empresa_id
-        LEFT JOIN ofertas o ON e.id = o.empresa_id
-        WHERE e.estado = 'activa'
+        SELECT id, ruc, razon_social, sector_economico, tamano_empresa, email_contacto, estado, fecha_registro
+        FROM empresas
+        WHERE 1=1
     """
     params = []
-    
-    if busqueda:
-        query += """ AND (
-            e.ruc ILIKE %s OR 
-            e.razon_social ILIKE %s OR
-            e.nombre_comercial ILIKE %s
-        )"""
-        busqueda_param = f"%{busqueda}%"
-        params.extend([busqueda_param, busqueda_param, busqueda_param])
-    
-    if sector != 'Todos':
-        query += " AND e.sector_economico = %s"
+    if estado:
+        query += " AND estado = %s"
+        params.append(estado)
+    if sector and sector != "Todos":
+        query += " AND sector_economico = %s"
         params.append(sector)
-    
-    query += """
-        GROUP BY e.id
-        ORDER BY e.razon_social
-        LIMIT 100
-    """
-    
+    if termino:
+        query += " AND (razon_social ILIKE %s OR nombre_comercial ILIKE %s OR ruc LIKE %s OR sector_economico ILIKE %s)"
+        t = f"%{termino}%"
+        params.extend([t, t, t, t])
+    query += " ORDER BY razon_social ASC"
+
     with get_db_cursor() as cur:
         cur.execute(query, params)
-        empresas = cur.fetchall()
+        cols = [d[0] for d in cur.description]
+        rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+
+    empresas = [Empresa.get_by_id(r["id"]) for r in rows]
+    
+    if empresas:
+        # Crear DataFrame con selección múltiple
+        data = []
+        for e in empresas:
+            d = e.to_dict()
+            d["seleccionar"] = False
+            data.append(d)
+        df = pd.DataFrame(data)
         
-        if empresas:
-            # Convertir a DataFrame para mostrar
-            df = pd.DataFrame(
-                empresas,
-                columns=['ID', 'RUC', 'Razón Social', 'Sector', 'Tamaño',
-                        'Email', 'Teléfono', 'Aprobación', 'Empleadores', 'Ofertas']
+        # Selección de columnas para mostrar
+        cols_display = ['seleccionar', 'ruc', 'razon_social', 'sector_economico', 'tamano_empresa', 'email_contacto', 'estado']
+        edited = st.data_editor(
+            df[cols_display],
+            column_config={
+                "seleccionar": st.column_config.CheckboxColumn("Seleccionar"),
+                "ruc": "RUC",
+                "razon_social": "Razón Social",
+                "sector_economico": "Sector",
+                "tamano_empresa": "Tamaño",
+                "email_contacto": "Contacto",
+                "estado": "Estado"
+            },
+            use_container_width=True,
+            hide_index=True
+        )
+
+        # Exportación múltiple a PDF
+        seleccionadas = edited[edited["seleccionar"] == True]  # noqa: E712
+        if not seleccionadas.empty:
+            empresas_sel = []
+            for _, row in seleccionadas.iterrows():
+                empresas_sel.append(
+                    {
+                        "ruc": row.get("ruc"),
+                        "razon_social": row.get("razon_social"),
+                        "sector_economico": row.get("sector_economico"),
+                        "tamano_empresa": row.get("tamano_empresa"),
+                        "estado": row.get("estado"),
+                    }
+                )
+
+            # KPIs del grupo
+            kpis = {
+                "total": len(empresas_sel),
+                "activas": sum(1 for e in empresas_sel if e.get("estado") == "activa"),
+                "pendientes": sum(1 for e in empresas_sel if e.get("estado") == "pendiente"),
+                "rechazadas": sum(1 for e in empresas_sel if e.get("estado") == "rechazada"),
+            }
+            top_sectores = (
+                pd.Series([e.get("sector_economico") for e in empresas_sel])
+                .value_counts()
+                .head(3)
+                .to_dict()
             )
-            
-            # Formatear fechas
-            df['Aprobación'] = pd.to_datetime(df['Aprobación']).dt.strftime('%d/%m/%Y')
-            
-            st.dataframe(
-                df[['RUC', 'Razón Social', 'Sector', 'Tamaño', 'Empleadores', 'Ofertas']],
+            kpis["top_sectores"] = ", ".join([f"{k}({v})" for k, v in top_sectores.items()]) if top_sectores else "—"
+
+            pdf_group = generar_pdf_empresas_seleccionadas(empresas_sel, kpis)
+            st.download_button(
+                "📦 Exportar Seleccionadas (PDF)",
+                data=pdf_group,
+                file_name="Empresas_seleccionadas.pdf",
+                mime="application/pdf",
                 use_container_width=True,
-                hide_index=True
             )
-            
-            # Opción para ver detalles de cada empresa
-            empresa_seleccionada = st.selectbox(
-                "Seleccionar empresa para ver detalles",
-                options=df['ID'].tolist(),
-                format_func=lambda x: df[df['ID'] == x]['Razón Social'].iloc[0]
+        
+        # Ver detalles individuales + ficha PDF por empresa
+        selected_ruc = st.selectbox(
+            "Seleccione una empresa para ver detalles:",
+            options=[e.ruc for e in empresas],
+            format_func=lambda r: next(e.razon_social for e in empresas if e.ruc == r),
+        )
+
+        if selected_ruc:
+            emp = next(e for e in empresas if e.ruc == selected_ruc)
+            with st.expander(f"Detalles de {emp.razon_social}", expanded=True):
+                col_a, col_b = st.columns([2, 1])
+                with col_a:
+                    mostrar_detalles_empresa(emp.id)
+                with col_b:
+                    ok, ficha_pdf = emp.generar_ficha_pdf()
+                    if ok:
+                        st.download_button(
+                            "📄 Ficha PDF",
+                            data=ficha_pdf,
+                            file_name=f"Ficha_Empresa_{emp.razon_social}.pdf",
+                            mime="application/pdf",
+                            use_container_width=True,
+                        )
+                    else:
+                        st.caption(str(ficha_pdf))
+    else:
+        st.warning("No se encontraron empresas activas.")
+
+
+def crear_empresa_admin():
+    """Formulario de creación de empresa (solo admin)."""
+    user = st.session_state.user
+    if user.get("rol") != "administrador":
+        st.warning("🔒 Solo administradores pueden crear empresas.")
+        return
+
+    st.subheader("➕ Registrar nueva empresa")
+    st.caption("Las empresas nuevas se registran como 'pendiente' para validación.")
+
+    with st.form("form_crear_empresa"):
+        col1, col2 = st.columns(2)
+        with col1:
+            ruc = st.text_input("RUC *", placeholder="11 dígitos")
+            razon_social = st.text_input("Razón social *")
+            nombre_comercial = st.text_input("Nombre comercial")
+            sector = st.text_input("Sector económico")
+        with col2:
+            tamano = st.selectbox("Tamaño", options=["micro", "pequeña", "mediana", "grande"])
+            direccion = st.text_input("Dirección")
+            telefono = st.text_input("Teléfono")
+            email = st.text_input("Email de contacto")
+            web = st.text_input("Sitio web")
+
+        submitted = st.form_submit_button("💾 Crear empresa", use_container_width=True)
+        if submitted:
+            if not ruc or not razon_social:
+                st.error("RUC y Razón social son obligatorios.")
+                return
+            if not Empresa.es_ruc_valido(ruc):
+                st.error("RUC inválido: deben ser 11 dígitos numéricos.")
+                return
+
+            emp = Empresa(
+                ruc=ruc,
+                razon_social=razon_social,
+                nombre_comercial=nombre_comercial,
+                sector_economico=sector,
+                tamano_empresa=tamano,
+                direccion=direccion,
+                telefono_contacto=telefono,
+                email_contacto=email,
+                sitio_web=web,
+                estado="pendiente",
             )
-            
-            if empresa_seleccionada:
-                with st.expander("Detalles de la empresa", expanded=True):
-                    mostrar_detalles_empresa(empresa_seleccionada)
-        else:
-            st.info("No se encontraron empresas con los filtros aplicados.")
+            ok, msg = emp.save()
+            if ok:
+                add_notification("Empresa creada correctamente (pendiente de aprobación).", "success")
+                st.rerun()
+            else:
+                st.error(msg)
+
+def aprobar_empresa_action(empresa):
+    """Lógica para el botón de aprobación."""
+    admin_id = st.session_state.user['id']
+    empresa.aprobar(admin_id)
+    add_notification(f"Empresa '{empresa.razon_social}' aprobada con éxito.", "success")
+    st.rerun()
+
+def rechazar_empresa_action(empresa, motivo):
+    """Lógica para el botón de rechazo."""
+    admin_id = st.session_state.user['id']
+    empresa.rechazar(admin_id, motivo)
+    add_notification(f"Empresa '{empresa.razon_social}' rechazada.", "warning")
+    st.rerun()
 
 def mostrar_estadisticas_empresas():
-    """Muestra estadísticas de empresas en el sistema."""
-    
-    st.subheader("Estadísticas de Empresas")
-    
-    col1, col2, col3, col4 = st.columns(4)
+    """Muestra estadísticas generales usando KPIs."""
+    st.subheader("Análisis del Sector Empresarial")
+
+    estado_filtro = st.selectbox(
+        "Filtrar gráficos por estado",
+        options=["Todos", "activa", "pendiente", "rechazada"],
+        index=0,
+        key="empresas_stats_estado",
+    )
+
+    where_estado = ""
+    params_estado = []
+    if estado_filtro != "Todos":
+        where_estado = "WHERE estado = %s"
+        params_estado = [estado_filtro]
     
     with get_db_cursor() as cur:
-        # Total empresas
+        # KPIs rápidos (aplican el mismo filtro de estado de los gráficos)
         cur.execute("SELECT COUNT(*) FROM empresas")
-        total = cur.fetchone()[0]
-        col1.metric("Total Empresas", total)
+        total_global = cur.fetchone()[0]
+
+        if estado_filtro == "Todos":
+            cur.execute("SELECT COUNT(*) FROM empresas")
+            total = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) FROM empresas WHERE estado = 'activa'")
+            activas = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) FROM empresas WHERE estado = 'pendiente'")
+            pendientes = cur.fetchone()[0]
+        else:
+            cur.execute("SELECT COUNT(*) FROM empresas WHERE estado = %s", [estado_filtro])
+            total = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) FROM empresas WHERE estado = %s AND estado = 'activa'", [estado_filtro])
+            activas = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) FROM empresas WHERE estado = %s AND estado = 'pendiente'", [estado_filtro])
+            pendientes = cur.fetchone()[0]
         
-        # Empresas por estado
-        cur.execute("""
-            SELECT 
-                COUNT(*) FILTER (WHERE estado = 'activa') as activas,
-                COUNT(*) FILTER (WHERE estado = 'pendiente') as pendientes,
-                COUNT(*) FILTER (WHERE estado = 'rechazada') as rechazadas
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Total Registradas", total)
+        c2.metric("Activas", activas)
+        c3.metric("Pendientes", pendientes, delta=pendientes, delta_color="inverse")
+
+        if estado_filtro != "Todos":
+            st.caption(f"KPIs filtrados por estado '{estado_filtro}'. Total global de empresas: {total_global}.")
+
+        # Distribución por sector económico
+        cur.execute(
+            f"""
+            SELECT
+                COALESCE(NULLIF(TRIM(sector_economico), ''), 'Sin especificar') AS sector,
+                COUNT(*) AS total
             FROM empresas
-        """)
-        activas, pendientes, rechazadas = cur.fetchone()
-        col2.metric("Activas", activas)
-        col3.metric("Pendientes", pendientes)
-        col4.metric("Rechazadas", rechazadas)
-    
+            {where_estado}
+            GROUP BY 1
+            ORDER BY total DESC, sector ASC
+            """,
+            params_estado,
+        )
+        sector_rows = cur.fetchall()
+
+        # Distribución por tamaño de empresa
+        cur.execute(
+            f"""
+            SELECT
+                COALESCE(NULLIF(TRIM(tamano_empresa), ''), 'Sin especificar') AS tamano,
+                COUNT(*) AS total
+            FROM empresas
+            {where_estado}
+            GROUP BY 1
+            ORDER BY total DESC, tamano ASC
+            """,
+            params_estado,
+        )
+        tamano_rows = cur.fetchall()
+
     st.markdown("---")
-    
-    # Gráfico de empresas por sector
-    with get_db_cursor() as cur:
-        cur.execute("""
-            SELECT sector_economico, COUNT(*)
-            FROM empresas
-            WHERE estado = 'activa'
-            GROUP BY sector_economico
-            ORDER BY COUNT(*) DESC
-        """)
-        datos_sector = cur.fetchall()
-        
-        if datos_sector:
-            df_sector = pd.DataFrame(datos_sector, columns=['Sector', 'Cantidad'])
-            
-            col_a, col_b = st.columns(2)
-            with col_a:
-                st.subheader("Empresas por Sector")
-                st.bar_chart(df_sector.set_index('Sector'))
-            
-            with col_b:
-                st.subheader("Distribución por Tamaño")
-                cur.execute("""
-                    SELECT tamano_empresa, COUNT(*)
-                    FROM empresas
-                    WHERE estado = 'activa'
-                    GROUP BY tamano_empresa
-                """)
-                df_tamano = pd.DataFrame(cur.fetchall(), columns=['Tamaño', 'Cantidad'])
-                if not df_tamano.empty:
-                    st.dataframe(df_tamano)
-    
-    # Empresas con más ofertas
-    st.subheader("Top 10 Empresas con más Ofertas")
-    with get_db_cursor() as cur:
-        cur.execute("""
-            SELECT 
-                e.razon_social,
-                COUNT(o.id) as total_ofertas,
-                COUNT(DISTINCT o.id) FILTER (WHERE o.activa) as ofertas_activas
-            FROM empresas e
-            LEFT JOIN ofertas o ON e.id = o.empresa_id
-            WHERE e.estado = 'activa'
-            GROUP BY e.id, e.razon_social
-            HAVING COUNT(o.id) > 0
-            ORDER BY total_ofertas DESC
-            LIMIT 10
-        """)
-        top_empresas = cur.fetchall()
-        
-        if top_empresas:
-            df_top = pd.DataFrame(
-                top_empresas,
-                columns=['Empresa', 'Total Ofertas', 'Ofertas Activas']
+    col_sector, col_tamano = st.columns(2)
+
+    with col_sector:
+        st.markdown("#### Distribución por Sector")
+        if sector_rows:
+            df_sector = pd.DataFrame(sector_rows, columns=["sector", "total"]).set_index("sector")
+            st.bar_chart(df_sector["total"], use_container_width=True)
+            st.dataframe(
+                df_sector.reset_index().rename(columns={"sector": "Sector", "total": "Empresas"}),
+                use_container_width=True,
+                hide_index=True,
             )
-            st.dataframe(df_top, use_container_width=True, hide_index=True)
+        else:
+            st.info("No hay datos de sector para mostrar.")
+
+    with col_tamano:
+        st.markdown("#### Distribución por Tamaño")
+        if tamano_rows:
+            orden_tamano = {
+                "micro": 1,
+                "pequeña": 2,
+                "mediana": 3,
+                "grande": 4,
+                "Sin especificar": 99,
+            }
+            df_tamano = pd.DataFrame(tamano_rows, columns=["tamano", "total"])
+            df_tamano["_orden"] = df_tamano["tamano"].map(lambda x: orden_tamano.get(str(x), 98))
+            df_tamano = df_tamano.sort_values(by=["_orden", "total"], ascending=[True, False]).drop(columns=["_orden"])
+            df_tamano = df_tamano.set_index("tamano")
+
+            st.bar_chart(df_tamano["total"], use_container_width=True)
+            st.dataframe(
+                df_tamano.reset_index().rename(columns={"tamano": "Tamaño", "total": "Empresas"}),
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.info("No hay datos de tamaño para mostrar.")
 
 def mostrar_detalles_empresa(empresa_id):
-    """Muestra los detalles completos de una empresa."""
-    
-    with get_db_cursor() as cur:
-        # Datos de la empresa
-        cur.execute("""
-            SELECT *
-            FROM empresas
-            WHERE id = %s
-        """, (empresa_id,))
-        
-        columnas = [desc[0] for desc in cur.description]
-        empresa = dict(zip(columnas, cur.fetchone()))
-        
-        # Mostrar información
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("**Información Legal**")
-            st.write(f"**RUC:** {empresa['ruc']}")
-            st.write(f"**Razón Social:** {empresa['razon_social']}")
-            st.write(f"**Nombre Comercial:** {empresa.get('nombre_comercial', 'N/A')}")
-            st.write(f"**Sector:** {empresa.get('sector_economico', 'N/A')}")
-            st.write(f"**Tamaño:** {empresa.get('tamano_empresa', 'N/A')}")
-        
-        with col2:
-            st.markdown("**Contacto**")
-            st.write(f"**Email:** {empresa.get('email_contacto', 'N/A')}")
-            st.write(f"**Teléfono:** {empresa.get('telefono_contacto', 'N/A')}")
-            st.write(f"**Dirección:** {empresa.get('direccion', 'N/A')}")
-            st.write(f"**Sitio Web:** {empresa.get('sitio_web', 'N/A')}")
-        
-        # Lista de empleadores de la empresa
-        st.subheader("Empleadores Registrados")
-        cur.execute("""
-            SELECT 
-                u.email,
-                e.nombres,
-                e.apellidos,
-                e.cargo,
-                e.es_administrador_empresa
-            FROM empleadores e
-            JOIN usuarios u ON e.usuario_id = u.id
-            WHERE e.empresa_id = %s
-        """, (empresa_id,))
-        
-        empleadores = cur.fetchall()
-        if empleadores:
-            df_emp = pd.DataFrame(
-                empleadores,
-                columns=['Email', 'Nombres', 'Apellidos', 'Cargo', 'Es Admin']
-            )
-            st.dataframe(df_emp, use_container_width=True, hide_index=True)
-        else:
-            st.info("No hay empleadores registrados para esta empresa")
-        
-        # Ofertas de la empresa
-        st.subheader("Ofertas Publicadas")
-        cur.execute("""
-            SELECT 
-                titulo,
-                tipo,
-                modalidad,
-                fecha_publicacion,
-                fecha_limite_postulacion,
-                activa,
-                (SELECT COUNT(*) FROM postulaciones WHERE oferta_id = o.id) as postulaciones
-            FROM ofertas o
-            WHERE empresa_id = %s
-            ORDER BY fecha_publicacion DESC
-            LIMIT 20
-        """, (empresa_id,))
-        
-        ofertas = cur.fetchall()
-        if ofertas:
-            df_ofertas = pd.DataFrame(
-                ofertas,
-                columns=['Título', 'Tipo', 'Modalidad', 'Publicación', 
-                        'Límite', 'Activa', 'Postulaciones']
-            )
-            st.dataframe(df_ofertas, use_container_width=True, hide_index=True)
-        else:
-            st.info("Esta empresa aún no ha publicado ofertas")
+    """Reutiliza la lógica de detalles del modelo y vista."""
+    emp = Empresa.get_by_id(empresa_id)
+    if not emp:
+        st.error("Empresa no encontrada.")
+        return
 
-def aprobar_empresa(empresa_id):
-    """Aprueba una empresa pendiente."""
+    c1, c2 = st.columns(2)
+    with c1:
+        st.write(f"**Dirección:** {emp.direccion}")
+        st.write(f"**Sitio Web:** {emp.sitio_web}")
+    with c2:
+        st.write(f"**Tamaño:** {emp.tamano_empresa}")
+        st.write(f"**Fecha Registro:** {emp.fecha_registro.strftime('%d/%m/%Y')}")
     
-    try:
-        with get_db_cursor(commit=True) as cur:
-            # Actualizar estado de la empresa
-            cur.execute("""
-                UPDATE empresas
-                SET estado = 'activa',
-                    fecha_aprobacion = NOW(),
-                    aprobado_por = %s
-                WHERE id = %s
-            """, (st.session_state.user['id'], empresa_id))
-            
-            # Notificar a los empleadores de la empresa
-            cur.execute("""
-                INSERT INTO notificaciones (usuario_id, tipo, asunto, mensaje)
-                SELECT u.id, 'email', 'Empresa aprobada',
-                       'Su empresa ha sido aprobada en el sistema. Ya puede publicar ofertas.'
-                FROM empleadores e
-                JOIN usuarios u ON e.usuario_id = u.id
-                WHERE e.empresa_id = %s
-            """, (empresa_id,))
-            
-            # Registrar en bitácora
-            cur.execute("""
-                INSERT INTO bitacora_auditoria
-                (usuario_id, perfil_utilizado, accion, modulo, detalle)
-                VALUES (%s, %s, 'UPDATE', 'empresas', %s)
-            """, (
-                st.session_state.user['id'],
-                st.session_state.user['rol'],
-                f"Empresa aprobada: {empresa_id}"
-            ))
-        
-        add_notification("Empresa aprobada exitosamente", "success")
-        st.rerun()
-        
-    except Exception as e:
-        add_notification(f"Error al aprobar empresa: {str(e)}", "error")
-
-def rechazar_empresa(empresa_id):
-    """Rechaza una empresa pendiente."""
-    
-    motivo = st.text_area("Motivo del rechazo", key=f"motivo_{empresa_id}")
-    
-    if st.button("Confirmar Rechazo", key=f"conf_{empresa_id}"):
-        try:
-            with get_db_cursor(commit=True) as cur:
-                # Actualizar estado
-                cur.execute("""
-                    UPDATE empresas
-                    SET estado = 'rechazada'
-                    WHERE id = %s
-                """, (empresa_id,))
-                
-                # Notificar rechazo
-                cur.execute("""
-                    INSERT INTO notificaciones (usuario_id, tipo, asunto, mensaje)
-                    SELECT u.id, 'email', 'Empresa no aprobada',
-                           'Su empresa no ha sido aprobada. Motivo: ' || %s
-                    FROM empleadores e
-                    JOIN usuarios u ON e.usuario_id = u.id
-                    WHERE e.empresa_id = %s
-                """, (motivo, empresa_id))
-                
-                # Registrar en bitácora
-                cur.execute("""
-                    INSERT INTO bitacora_auditoria
-                    (usuario_id, perfil_utilizado, accion, modulo, detalle)
-                    VALUES (%s, %s, 'UPDATE', 'empresas', %s)
-                """, (
-                    st.session_state.user['id'],
-                    st.session_state.user['rol'],
-                    f"Empresa rechazada: {empresa_id} - Motivo: {motivo}"
-                ))
-            
-            add_notification("Empresa rechazada", "warning")
-            st.rerun()
-            
-        except Exception as e:
-            add_notification(f"Error al rechazar empresa: {str(e)}", "error")
+    st.markdown("---")
+    st.subheader("👥 Empleadores Asociados")
+    empleadores = emp.get_empleadores()
+    if empleadores:
+        for em in empleadores:
+            st.write(f"- {em.nombre_completo} ({em.cargo})")
+    else:
+        st.caption("No hay empleadores vinculados aún.")

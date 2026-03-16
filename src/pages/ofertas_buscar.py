@@ -6,65 +6,57 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, date
 from src.utils.database import get_db_cursor
-from src.utils.session import add_notification, set_filter, get_filter
+from src.utils.session import add_notification, render_notifications
+from src.utils.pdf_generator import generar_pdf_oferta_detalle
 
 def show():
     """Muestra la página de búsqueda de ofertas."""
-    
+    user = st.session_state.user
+    if user.get('rol') != 'egresado':
+        st.error("Solo egresados pueden acceder a esta página.")
+        return
+
     st.title("💼 Buscar Ofertas Laborales")
+    render_notifications()
     
     # Inicializar filtros en sesión si no existen
     if 'filtros_ofertas' not in st.session_state:
         st.session_state.filtros_ofertas = {}
     
-    # Sidebar con filtros
-    with st.sidebar:
-        st.header("Filtros de Búsqueda")
-        
-        # Búsqueda por palabra clave
-        palabra_clave = st.text_input(
-            "🔍 Palabra clave",
-            value=st.session_state.filtros_ofertas.get('palabra_clave', ''),
-            placeholder="Ej: Ingeniero, Python, Ventas..."
-        )
-        
-        st.markdown("---")
-        
-        # Filtros principales
-        tipo_oferta = st.selectbox(
-            "Tipo de Oferta",
-            options=['Todos', 'empleo', 'pasantia', 'practicas'],
-            index=0
-        )
-        
-        modalidad = st.selectbox(
-            "Modalidad",
-            options=['Todas', 'presencial', 'remoto', 'hibrido'],
-            index=0
-        )
-        
-        # Rango salarial
-        st.subheader("Rango Salarial (S/.)")
-        salario_min = st.number_input("Mínimo", min_value=0, value=0, step=500)
-        salario_max = st.number_input("Máximo", min_value=0, value=10000, step=500)
-        
-        # Fecha límite
-        st.subheader("Fecha Límite")
-        fecha_hasta = st.date_input(
-            "Mostrar ofertas hasta",
-            value=date.today() + pd.DateOffset(months=1),
-            min_value=date.today()
-        )
-        
-        # Botones de acción
-        col1, col2 = st.columns(2)
+    with st.expander("🔍 Filtros de búsqueda", expanded=True):
+        col1, col2, col3 = st.columns(3)
         with col1:
-            if st.button("Aplicar Filtros", use_container_width=True):
-                guardar_filtros(palabra_clave, tipo_oferta, modalidad,
-                              salario_min, salario_max, fecha_hasta)
-                st.rerun()
-        
+            palabra_clave = st.text_input(
+                "Palabra clave",
+                value=st.session_state.filtros_ofertas.get('palabra_clave', ''),
+                placeholder="Ej: Ingeniero, Python, Ventas..."
+            )
+            tipo_oferta = st.selectbox(
+                "Tipo de Oferta",
+                options=['Todos', 'empleo', 'pasantia', 'practicas'],
+                index=0
+            )
         with col2:
+            modalidad = st.selectbox(
+                "Modalidad",
+                options=['Todas', 'presencial', 'remoto', 'hibrido'],
+                index=0
+            )
+            fecha_hasta = st.date_input(
+                "Mostrar ofertas hasta",
+                value=date.today() + pd.DateOffset(months=1),
+                min_value=date.today()
+            )
+        with col3:
+            salario_min = st.number_input("Salario mínimo (S/)", min_value=0, value=0, step=500)
+            salario_max = st.number_input("Salario máximo (S/)", min_value=0, value=10000, step=500)
+
+        b1, b2 = st.columns(2)
+        with b1:
+            if st.button("Aplicar Filtros", use_container_width=True):
+                guardar_filtros(palabra_clave, tipo_oferta, modalidad, salario_min, salario_max, fecha_hasta)
+                st.rerun()
+        with b2:
             if st.button("Limpiar Filtros", use_container_width=True):
                 st.session_state.filtros_ofertas = {}
                 st.rerun()
@@ -109,8 +101,12 @@ def buscar_ofertas():
             o.salario_max,
             o.fecha_publicacion,
             o.fecha_limite_postulacion,
+            o.requisitos,
+            o.ubicacion,
             e.razon_social as empresa,
+            e.ruc as empresa_ruc,
             e.logo_url,
+            e.sitio_web,
             COUNT(p.id) as total_postulaciones,
             BOOL_OR(p.egresado_id = (SELECT id FROM egresados WHERE usuario_id = %s)) as ya_postulado
         FROM ofertas o
@@ -187,6 +183,8 @@ def mostrar_tarjeta_oferta(oferta):
             badges = []
             badges.append(f"📍 {oferta['modalidad'].capitalize()}")
             badges.append(f"📋 {oferta['tipo'].capitalize()}")
+            if oferta.get('ubicacion'):
+                badges.append(f"🗺️ {oferta['ubicacion']}")
             
             if oferta['salario_min'] and oferta['salario_max']:
                 badges.append(f"💰 S/ {oferta['salario_min']} - {oferta['salario_max']}")
@@ -207,6 +205,38 @@ def mostrar_tarjeta_oferta(oferta):
             else:
                 if st.button("Postular Ahora", key=f"post_{oferta['id']}", type="primary"):
                     postular_a_oferta(oferta['id'])
+
+            salario_txt = "No especificado"
+            if oferta.get('salario_min') and oferta.get('salario_max'):
+                salario_txt = f"S/ {oferta['salario_min']} - S/ {oferta['salario_max']}"
+            elif oferta.get('salario_min'):
+                salario_txt = f"Desde S/ {oferta['salario_min']}"
+
+            pdf_data = {
+                "titulo": oferta.get("titulo"),
+                "tipo": oferta.get("tipo"),
+                "modalidad": oferta.get("modalidad"),
+                "ubicacion": oferta.get("ubicacion") or "No especificada",
+                "salario": salario_txt,
+                "fecha_publicacion": oferta.get("fecha_publicacion").strftime("%d/%m/%Y") if oferta.get("fecha_publicacion") else "",
+                "fecha_limite": oferta.get("fecha_limite_postulacion").strftime("%d/%m/%Y") if oferta.get("fecha_limite_postulacion") else "",
+                "activa": True,
+                "descripcion": oferta.get("descripcion"),
+                "requisitos": oferta.get("requisitos"),
+            }
+            pdf_bytes = generar_pdf_oferta_detalle(
+                empresa_data={"razon_social": oferta.get("empresa"), "ruc": oferta.get("empresa_ruc")},
+                oferta_data=pdf_data,
+                public_url=oferta.get("sitio_web"),
+            )
+            st.download_button(
+                "📄 PDF Oferta",
+                data=pdf_bytes,
+                file_name=f"Oferta_{str(oferta.get('titulo', 'detalle')).strip().replace(' ', '_')[:40]}.pdf",
+                mime="application/pdf",
+                key=f"pdf_of_{oferta['id']}",
+                use_container_width=True,
+            )
         
         st.markdown("---")
 
@@ -230,9 +260,15 @@ def postular_a_oferta(oferta_id):
             cur.execute("""
                 INSERT INTO postulaciones (oferta_id, egresado_id, fecha_postulacion, estado)
                 VALUES (%s, %s, NOW(), 'recibido')
+                ON CONFLICT (oferta_id, egresado_id) DO NOTHING
+                RETURNING id
             """, (oferta_id, egresado_id))
-            
-            add_notification("¡Postulación enviada con éxito!", "success")
+
+            inserted = cur.fetchone()
+            if inserted:
+                add_notification("¡Postulación enviada con éxito!", "success")
+            else:
+                add_notification("Ya estabas postulado a esta oferta.", "warning")
             st.rerun()
             
     except Exception as e:

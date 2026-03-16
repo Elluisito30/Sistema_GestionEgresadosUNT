@@ -64,7 +64,7 @@ class Postulacion:
             columns = [desc[0] for desc in cur.description]
             return [dict(zip(columns, row)) for row in cur.fetchall()]
     
-    def cambiar_estado(self, nuevo_estado, comentario=None):
+    def cambiar_estado(self, nuevo_estado, comentario=None, empresa_id=None):
         """Cambia el estado de la postulación."""
         estados_validos = ['recibido', 'en_revision', 'entrevista', 
                           'seleccionado', 'descartado']
@@ -73,6 +73,20 @@ class Postulacion:
             return False, "Estado no válido"
         
         with get_db_cursor(commit=True) as cur:
+            # Validación de pertenencia para evitar cambios de estado fuera de la empresa autorizada
+            if empresa_id:
+                cur.execute(
+                    """
+                    SELECT 1
+                    FROM postulaciones p
+                    JOIN ofertas o ON p.oferta_id = o.id
+                    WHERE p.id = %s AND o.empresa_id = %s
+                    """,
+                    (self.id, empresa_id),
+                )
+                if not cur.fetchone():
+                    return False, "No autorizado para actualizar esta postulación"
+
             cur.execute("""
                 UPDATE postulaciones
                 SET estado = %s,
@@ -108,7 +122,11 @@ class Postulacion:
                 WHERE p.id = %s
             """, (self.id,))
             
-            usuario_id, oferta_titulo = cur.fetchone()
+            res = cur.fetchone()
+            if not res:
+                return
+
+            usuario_id, oferta_titulo = res
             
             # Crear notificación
             cur.execute("""
