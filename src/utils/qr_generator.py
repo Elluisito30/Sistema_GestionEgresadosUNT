@@ -41,6 +41,11 @@ class QRGenerator:
         return img_bytes.getvalue()
     
     @staticmethod
+    def build_voucher_validation_url(codigo_voucher: str, base_url: str = "https://sistema.unitru.edu.pe") -> str:
+        """Construye la URL de validación para un voucher."""
+        return f"{base_url}/validar/{codigo_voucher}"
+
+    @staticmethod
     def generate_voucher_qr(codigo_voucher: str, base_url: str = "https://sistema.unitru.edu.pe") -> bytes:
         """
         Genera un QR específico para voucher.
@@ -52,7 +57,7 @@ class QRGenerator:
         Returns:
             bytes: Imagen PNG del QR
         """
-        url = f"{base_url}/validar/{codigo_voucher}"
+        url = QRGenerator.build_voucher_validation_url(codigo_voucher, base_url)
         return QRGenerator.generate_qr(url)
     
     @staticmethod

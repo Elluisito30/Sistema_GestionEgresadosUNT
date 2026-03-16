@@ -3,10 +3,11 @@ Modelo de Pago para el sistema.
 Representa un pago realizado por un usuario.
 """
 from datetime import datetime
-from src.utils.database import get_db_cursor
-import uuid
-import qrcode
 import io
+import uuid
+
+from src.utils.database import get_db_cursor
+from src.utils.qr_generator import QRGenerator
 
 class Pago:
     """Clase que representa un pago."""
@@ -62,6 +63,174 @@ class Pago:
             if row:
                 return cls(*row)
             return None
+
+    @classmethod
+    def obtener_historial_usuario(cls, usuario_id):
+        """Obtiene el historial de pagos de un usuario con descripción."""
+        with get_db_cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    p.id,
+                    p.concepto,
+                    p.referencia_id,
+                    p.monto,
+                    p.fecha_pago,
+                    p.codigo_voucher,
+                    p.pagado,
+                    p.validado,
+                    CASE
+                        WHEN p.concepto = 'evento' THEN COALESCE((SELECT titulo FROM eventos WHERE id = p.referencia_id::uuid), 'Evento')
+                        WHEN p.concepto = 'certificado' THEN 'Certificado'
+                        WHEN p.concepto = 'membresia' THEN 'Membresía'
+                    END as descripcion
+                FROM pagos p
+                WHERE p.usuario_id = %s
+                ORDER BY p.fecha_pago DESC
+                """,
+                (usuario_id,),
+            )
+            return cur.fetchall()
+
+    @classmethod
+    def obtener_todos(cls, limit=1000):
+        """Obtiene todos los pagos para la vista administrativa."""
+        with get_db_cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    p.id,
+                    u.email,
+                    p.concepto,
+                    p.monto,
+                    p.fecha_pago,
+                    p.codigo_voucher,
+                    p.pagado,
+                    p.validado
+                FROM pagos p
+                JOIN usuarios u ON p.usuario_id = u.id
+                ORDER BY p.fecha_pago DESC
+                LIMIT %s
+                """,
+                (limit,),
+            )
+            return cur.fetchall()
+
+    @classmethod
+    def obtener_pendientes_validacion(cls, limit=20):
+        """Obtiene vouchers pagados que aún no fueron validados."""
+        with get_db_cursor() as cur:
+            cur.execute(
+                """
+                SELECT p.id, p.codigo_voucher, u.email, p.concepto, p.monto, p.fecha_pago
+                FROM pagos p
+                JOIN usuarios u ON u.id = p.usuario_id
+                WHERE p.pagado = true AND p.validado = false
+                ORDER BY p.fecha_pago DESC
+                LIMIT %s
+                """,
+                (limit,),
+            )
+            return cur.fetchall()
+
+    @classmethod
+    def obtener_ingresos_12_meses(cls):
+        """Obtiene métricas mensuales de ingresos y cantidad de pagos."""
+        with get_db_cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    DATE_TRUNC('month', fecha_pago)::date as mes,
+                    SUM(monto) as total,
+                    COUNT(*) as cantidad
+                FROM pagos
+                WHERE pagado = true
+                AND fecha_pago > NOW() - INTERVAL '12 months'
+                GROUP BY mes
+                ORDER BY mes
+                """
+            )
+            return cur.fetchall()
+
+    @classmethod
+    def obtener_distribucion_conceptos(cls):
+        """Obtiene distribución de pagos por concepto."""
+        with get_db_cursor() as cur:
+            cur.execute(
+                """
+                SELECT concepto, COUNT(*), SUM(monto)
+                FROM pagos
+                WHERE pagado = true
+                GROUP BY concepto
+                """
+            )
+            return cur.fetchall()
+
+    @classmethod
+    def obtener_detalle_voucher(cls, pago_id):
+        """Obtiene detalle completo de un voucher para visualización/PDF."""
+        with get_db_cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    p.id,
+                    p.usuario_id,
+                    p.concepto,
+                    p.monto,
+                    p.fecha_pago,
+                    p.codigo_voucher,
+                    p.qr_code_data,
+                    p.validado,
+                    p.pdf_voucher_url,
+                    u.email,
+                    CASE
+                        WHEN e.id IS NOT NULL THEN TRIM(e.nombres || ' ' || e.apellido_paterno || ' ' || COALESCE(e.apellido_materno, ''))
+                        WHEN em.id IS NOT NULL THEN TRIM(em.nombres || ' ' || em.apellidos)
+                        ELSE 'Administrador'
+                    END as nombre
+                FROM pagos p
+                JOIN usuarios u ON p.usuario_id = u.id
+                LEFT JOIN egresados e ON u.id = e.usuario_id
+                LEFT JOIN empleadores em ON u.id = em.usuario_id
+                WHERE p.id = %s
+                """,
+                (pago_id,),
+            )
+            row = cur.fetchone()
+
+        if not row:
+            return None
+
+        return {
+            "id": row[0],
+            "usuario_id": row[1],
+            "concepto": row[2],
+            "monto": row[3],
+            "fecha_pago": row[4],
+            "codigo_voucher": row[5],
+            "qr_code_data": row[6],
+            "validado": row[7],
+            "pdf_voucher_url": row[8],
+            "email": row[9],
+            "nombre": row[10],
+        }
+
+    @classmethod
+    def validar_por_id(cls, pago_id):
+        """Valida un voucher por su ID y retorna su código."""
+        with get_db_cursor(commit=True) as cur:
+            cur.execute(
+                """
+                UPDATE pagos
+                SET validado = true
+                WHERE id = %s
+                RETURNING codigo_voucher
+                """,
+                (pago_id,),
+            )
+            row = cur.fetchone()
+
+        return row[0] if row else None
     
     @classmethod
     def crear_pago(cls, usuario_id, concepto, monto, referencia_id=None):
@@ -70,7 +239,7 @@ class Pago:
         codigo_voucher = f"VCH-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:8].upper()}"
         
         # Generar datos para QR
-        qr_data = f"https://tusitio.com/validar/{codigo_voucher}"
+        qr_data = QRGenerator.build_voucher_validation_url(codigo_voucher)
         
         with get_db_cursor(commit=True) as cur:
             cur.execute("""
@@ -88,33 +257,17 @@ class Pago:
     
     def generar_qr(self):
         """Genera la imagen QR para el voucher."""
-        qr = qrcode.QRCode(version=1, box_size=10, border=5)
-        qr.add_data(self.qr_code_data or f"PAGO:{self.codigo_voucher}")
-        qr.make(fit=True)
-        
-        img = qr.make_image(fill_color="black", back_color="white")
-        
-        # Convertir a bytes
-        img_bytes = io.BytesIO()
-        img.save(img_bytes, format='PNG')
-        img_bytes.seek(0)
-        
-        return img_bytes
+        qr_source = self.codigo_voucher or ""
+        qr_bytes = QRGenerator.generate_voucher_qr(qr_source)
+        return io.BytesIO(qr_bytes)
     
     def validar(self):
         """Valida el voucher (marca como usado)."""
-        with get_db_cursor(commit=True) as cur:
-            cur.execute("""
-                UPDATE pagos
-                SET validado = true
-                WHERE id = %s
-                RETURNING id
-            """, (self.id,))
-            
-            if cur.fetchone():
-                self.validado = True
-                return True
-            return False
+        codigo = self.validar_por_id(self.id)
+        if codigo:
+            self.validado = True
+            return True
+        return False
     
     def get_descripcion_concepto(self):
         """Obtiene la descripción del concepto asociado."""

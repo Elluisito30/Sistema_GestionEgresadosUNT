@@ -42,13 +42,11 @@ def test_generar_qr(test_db, test_user):
         usuario_id=test_user.id,
         concepto="evento",
         monto=100.00,
-        referencia_id="test_uuid" # En un caso real, seria el UUID del evento
+        referencia_id=None,
     )
     
     qr_bytes = pago.generar_qr()
     assert qr_bytes is not None
-    # Leer algo de png header o tamaño
     qr_bytes.seek(0)
     magic = qr_bytes.read(4)
-    # Check PNG magic number \x89PNG
     assert magic == b'\x89PNG'

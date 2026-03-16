@@ -3,13 +3,21 @@ from dotenv import load_dotenv
 
 load_dotenv()  # Carga variables de entorno desde .env
 
+
+def get_env(*keys, default=None):
+    for key in keys:
+        value = os.getenv(key)
+        if value:
+            return value
+    return default
+
 # Configuración de la Base de Datos
 DB_CONFIG = {
-    "host": os.getenv("DB_HOST", "localhost"),
-    "database": os.getenv("DB_NAME", "bd_egresadosUNT"),
-    "user": os.getenv("DB_USER", "postgres"),
-    "password": os.getenv("DB_PASSWORD", "postgres"),
-    "port": os.getenv("DB_PORT", "5432")
+    "host": get_env("DB_HOST", default="localhost"),
+    "database": get_env("DB_NAME", "POSTGRES_DB", default="egresados_unt_db"),
+    "user": get_env("DB_USER", "POSTGRES_USER", default="postgres"),
+    "password": get_env("DB_PASSWORD", "POSTGRES_PASSWORD", default="postgres"),
+    "port": get_env("DB_PORT", default="5432")
 }
 
 # Otras configuraciones

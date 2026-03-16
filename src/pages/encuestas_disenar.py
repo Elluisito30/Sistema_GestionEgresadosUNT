@@ -2,12 +2,14 @@
 Módulo de diseño de encuestas para administradores.
 Permite crear y gestionar encuestas.
 """
-import streamlit as st
+import json
+from datetime import date, datetime, timedelta
+
 import pandas as pd
-from datetime import datetime, timedelta
+import streamlit as st
+
 from src.utils.database import get_db_cursor
 from src.utils.session import add_notification
-import json
 
 def show():
     """Muestra la página de diseño de encuestas."""
@@ -332,7 +334,7 @@ def eliminar_encuesta(encuesta_id):
     """Elimina una encuesta (solo si no tiene respuestas)."""
     
     try:
-        with get_db_cursor() as cur:
+        with get_db_cursor(commit=True) as cur:
             # Verificar si tiene respuestas
             cur.execute("SELECT COUNT(*) FROM respuestas_encuesta WHERE encuesta_id = %s", (encuesta_id,))
             if cur.fetchone()[0] > 0:
@@ -350,6 +352,54 @@ def eliminar_encuesta(encuesta_id):
             
     except Exception as e:
         add_notification(f"Error al eliminar: {str(e)}", "error")
+
+
+def ver_encuesta_detalle(encuesta_id):
+    """Muestra el detalle de una encuesta y sus preguntas."""
+    with get_db_cursor() as cur:
+        cur.execute("""
+            SELECT titulo, descripcion, fecha_inicio, fecha_fin, activa
+            FROM encuestas
+            WHERE id = %s
+        """, (encuesta_id,))
+        encuesta = cur.fetchone()
+
+        if not encuesta:
+            st.error("No se encontró la encuesta seleccionada.")
+            return
+
+        cur.execute("""
+            SELECT texto_pregunta, tipo_respuesta, opciones
+            FROM preguntas_encuesta
+            WHERE encuesta_id = %s
+            ORDER BY id
+        """, (encuesta_id,))
+        preguntas = cur.fetchall()
+
+    titulo, descripcion, fecha_inicio, fecha_fin, activa = encuesta
+    estado = "Activa" if activa else "Inactiva"
+
+    with st.expander(f"Detalle: {titulo}", expanded=True):
+        st.markdown(f"**Estado:** {estado}")
+        st.markdown(f"**Periodo:** {fecha_inicio} al {fecha_fin}")
+        if descripcion:
+            st.markdown(descripcion)
+
+        if not preguntas:
+            st.info("La encuesta todavía no tiene preguntas registradas.")
+            return
+
+        for index, (texto, tipo, opciones) in enumerate(preguntas, 1):
+            st.markdown(f"**{index}. {texto}**")
+            st.caption(f"Tipo: {tipo}")
+            if opciones:
+                try:
+                    opciones_lista = json.loads(opciones) if isinstance(opciones, str) else opciones
+                except Exception:
+                    opciones_lista = []
+                if opciones_lista:
+                    st.caption(f"Opciones: {', '.join(opciones_lista)}")
+
 
 def ver_resultados_encuestas():
     """Muestra los resultados de las encuestas."""

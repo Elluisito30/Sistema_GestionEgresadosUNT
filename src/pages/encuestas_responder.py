@@ -2,11 +2,15 @@
 Módulo de encuestas para egresados.
 Permite responder encuestas de seguimiento.
 """
-import streamlit as st
-import pandas as pd
+import json
 from datetime import datetime
+
+import pandas as pd
+import streamlit as st
+
 from src.utils.database import get_db_cursor
 from src.utils.session import add_notification
+
 
 def show():
     """Muestra la página de encuestas para egresados."""
@@ -30,6 +34,18 @@ def show():
             return
         
         egresado_id = egresado[0]
+
+    encuesta_actual = st.session_state.get('encuesta_actual')
+    if encuesta_actual and encuesta_actual.get('egresado_id') == egresado_id:
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.caption("Tienes una encuesta en progreso. Puedes continuarla o salir guardando tu avance.")
+        with col2:
+            if st.button("❌ Cerrar encuesta", key="cerrar_encuesta_actual", use_container_width=True):
+                del st.session_state.encuesta_actual
+                st.rerun()
+        mostrar_pregunta_actual()
+        return
     
     # Tabs
     tab1, tab2 = st.tabs(["📋 Encuestas Pendientes", "✅ Encuestas Completadas"])
@@ -164,7 +180,7 @@ def responder_encuesta(encuesta_id, egresado_id):
         'respuestas': {}
     }
     
-    # Cargar respuestas existentes
+    # Cargar respuestas existentes y retomar en la primera pregunta pendiente.
     with get_db_cursor() as cur:
         cur.execute("""
             SELECT pregunta_id, respuesta
@@ -174,6 +190,21 @@ def responder_encuesta(encuesta_id, egresado_id):
         
         for pregunta_id, respuesta in cur.fetchall():
             st.session_state.encuesta_actual['respuestas'][pregunta_id] = respuesta
+
+        cur.execute("""
+            SELECT id
+            FROM preguntas_encuesta
+            WHERE encuesta_id = %s
+            ORDER BY id
+        """, (encuesta_id,))
+        preguntas_ids = [pregunta_id for pregunta_id, in cur.fetchall()]
+
+    for index, pregunta_id in enumerate(preguntas_ids):
+        if pregunta_id not in st.session_state.encuesta_actual['respuestas']:
+            st.session_state.encuesta_actual['pregunta_actual'] = index
+            break
+    else:
+        st.session_state.encuesta_actual['pregunta_actual'] = len(preguntas_ids)
     
     st.rerun()
 
@@ -228,10 +259,21 @@ def mostrar_pregunta_actual():
         respuesta = st.text_area("Tu respuesta:", value=respuesta_guardada, key=f"resp_{pregunta_id}")
     
     elif tipo == 'opcion_multiple':
-        opciones_list = eval(opciones) if opciones else []
-        respuesta = st.radio("Selecciona una opción:", opciones_list, 
-                             index=opciones_list.index(respuesta_guardada) if respuesta_guardada in opciones_list else 0,
-                             key=f"resp_{pregunta_id}")
+        if isinstance(opciones, list):
+            opciones_list = opciones
+        else:
+            opciones_list = json.loads(opciones) if opciones else []
+
+        if not opciones_list:
+            st.warning("Esta pregunta no tiene opciones configuradas.")
+            respuesta = respuesta_guardada
+        else:
+            respuesta = st.radio(
+                "Selecciona una opción:",
+                opciones_list,
+                index=opciones_list.index(respuesta_guardada) if respuesta_guardada in opciones_list else 0,
+                key=f"resp_{pregunta_id}"
+            )
     
     elif tipo == 'escala':
         respuesta = st.slider("Selecciona un valor:", 1, 10, 

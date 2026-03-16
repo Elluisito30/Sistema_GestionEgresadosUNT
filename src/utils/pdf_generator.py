@@ -43,6 +43,67 @@ def _dibujar_marca_agua_unt(c, width, height):
         return
 
 
+def generar_pdf_voucher_pago(voucher_data, qr_bytes=None):
+    """Genera un PDF de voucher de pago."""
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+
+    _dibujar_marca_agua_unt(c, width, height)
+
+    c.setAuthor("Sistema de Egresados UNT")
+    c.setTitle(f"Voucher {voucher_data.get('codigo_voucher', '')}")
+
+    c.setFont("Helvetica-Bold", 16)
+    c.drawCentredString(width / 2, height - 2 * cm, "UNIVERSIDAD NACIONAL DE TRUJILLO")
+    c.setFont("Helvetica", 10)
+    c.drawCentredString(width / 2, height - 2.5 * cm, "Sistema de Gestión de Egresados y Empleabilidad")
+    c.setLineWidth(1)
+    c.line(2 * cm, height - 3 * cm, width - 2 * cm, height - 3 * cm)
+
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(2 * cm, height - 4 * cm, "VOUCHER DE PAGO")
+
+    fecha_pago = voucher_data.get("fecha_pago")
+    if hasattr(fecha_pago, "strftime"):
+        fecha_str = fecha_pago.strftime("%d/%m/%Y %H:%M")
+    else:
+        fecha_str = str(fecha_pago or datetime.now().strftime("%d/%m/%Y %H:%M"))
+
+    y = height - 5 * cm
+    c.setFont("Helvetica", 11)
+    filas = [
+        ("Código voucher:", voucher_data.get("codigo_voucher", "")),
+        ("Usuario:", voucher_data.get("nombre", "")),
+        ("Email:", voucher_data.get("email", "")),
+        ("Concepto:", str(voucher_data.get("concepto", "")).upper()),
+        ("Monto:", f"S/. {float(voucher_data.get('monto', 0) or 0):.2f}"),
+        ("Fecha pago:", fecha_str),
+        ("Estado:", "VALIDADO" if voucher_data.get("validado") else "PENDIENTE DE VALIDACIÓN"),
+    ]
+
+    for label, value in filas:
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(2.5 * cm, y, label)
+        c.setFont("Helvetica", 10)
+        c.drawString(6.5 * cm, y, str(value))
+        y -= 0.7 * cm
+
+    if qr_bytes:
+        qr_buffer = io.BytesIO(qr_bytes)
+        qr_image = ImageReader(qr_buffer)
+        c.drawImage(qr_image, width - 7 * cm, height - 11.5 * cm, width=4.5 * cm, height=4.5 * cm, mask="auto")
+
+    c.setFont("Helvetica-Oblique", 8)
+    c.drawString(2 * cm, 1.8 * cm, "Documento generado automáticamente por el Sistema de Egresados UNT")
+
+    c.showPage()
+    c.save()
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+    return pdf_bytes
+
+
 def generar_pdf_bitacora(df, titulo_reporte="Reporte de Bitácora"):
     """Genera un PDF con los registros de la bitácora en formato tabla."""
     buffer = io.BytesIO()

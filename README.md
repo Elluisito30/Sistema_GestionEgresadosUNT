@@ -30,16 +30,41 @@ Sigue estos pasos para levantar el entorno completo:
 git clone <url-del-repositorio>
 cd egresados_unt_app
 ```
+
+### 2. Crea tu archivo de variables de entorno
+
+Usa el archivo [.env.example](.env.example) como base:
+
+```bash
+copy .env.example .env
+```
+
+En PowerShell también puedes usar:
+
+```powershell
+Copy-Item .env.example .env
+```
  
-### 2. Inicia los servicios con Docker Compose
+### 3. Inicia los servicios con Docker Compose
  
 ```bash
 docker-compose up -d
 ```
  
 > Este comando descargará las imágenes necesarias (PostgreSQL, pgAdmin) y construirá la imagen de la aplicación Streamlit. La primera vez puede tomar varios minutos.
+>
+> En una base de datos nueva, Docker ejecuta automáticamente [database/create_bd.sql](database/create_bd.sql) y [database/seed_bd.sql](database/seed_bd.sql), por lo que el esquema y los usuarios de prueba quedan listos al primer arranque.
+
+### 4. Si ya tenías un volumen creado y quieres reinicializar la base
+
+Los scripts de inicialización de PostgreSQL solo se ejecutan la primera vez que se crea el volumen. Si ya levantaste el proyecto antes y quieres regenerar la base con datos de prueba:
+
+```bash
+docker-compose down -v
+docker-compose up -d
+```
  
-### 3. Accede a la aplicación
+### 5. Accede a la aplicación
  
 | Servicio | URL |
 |---|---|
@@ -48,7 +73,7 @@ docker-compose up -d
  
 **Credenciales de pgAdmin:**
 - Email: `admin@admin.com`
-- Contraseña: `admin`
+- Contraseña: `postgres`
  
 **Para conectar al servidor de BD desde pgAdmin:**
  
@@ -64,13 +89,13 @@ docker-compose up -d
  
 ## Credenciales de Prueba (Base de Datos Inicial)
  
-Después de ejecutar el script `database/init.sql`, se pueden usar los siguientes usuarios de prueba:
+Después del primer arranque con Docker en una base nueva, se cargan automáticamente datos de prueba desde [database/seed_bd.sql](database/seed_bd.sql). Puedes usar los siguientes usuarios:
  
 | Rol | Usuario | Contraseña |
 |---|---|---|
 | Administrador | `admin@unitru.edu.pe` | `admin123` |
-| Egresado | `juan.perez@unitru.edu.pe` | `egresado123` |
-| Empleador | `contacto@techcorp.com` | `empresa123` |
+| Egresado | `juan.perez@unitru.edu.pe` | `juan123` |
+| Empleador | `rrhh@techandina.com` | `empleador123` |
  
 > **Nota:** La empresa empleadora debe estar activa en el sistema. En un entorno real, las contraseñas deben ser mucho más seguras.
  
@@ -83,8 +108,10 @@ egresados_unt_app/
 ├── app.py                  # Punto de entrada de la aplicación
 ├── src/                    # Lógica de la aplicación (autenticación, páginas, utilidades)
 ├── database/
-│   └── init.sql            # Script SQL para crear el esquema de la base de datos
+│   ├── create_bd.sql       # Script SQL para crear el esquema de la base de datos
+│   └── seed_bd.sql         # Datos de prueba para desarrollo
 ├── docker-compose.yml      # Orquestación de servicios (app, db, pgadmin)
+├── .env.example            # Plantilla de variables de entorno
 └── Dockerfile              # Definición de la imagen de la aplicación
 ```
  

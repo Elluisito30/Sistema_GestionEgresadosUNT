@@ -2,9 +2,11 @@
 Módulo de consultas avanzadas.
 Permite realizar búsquedas complejas con múltiples filtros.
 """
-import streamlit as st
+from datetime import date, datetime, timedelta
+
 import pandas as pd
-from datetime import datetime, timedelta
+import streamlit as st
+
 from src.utils.database import get_db_cursor
 from src.utils.session import add_notification
 
@@ -565,7 +567,7 @@ def consulta_tendencia():
                 COUNT(*) as ofertas,
                 COUNT(*) FILTER (WHERE activa = false) as cerradas
             FROM ofertas
-            WHERE fecha_publicacion > NOW() - INTERVAL '%s months'
+            WHERE fecha_publicacion > NOW() - (%s || ' months')::interval
             GROUP BY mes
             ORDER BY mes
         """, (meses,))
@@ -589,7 +591,7 @@ def consulta_tendencia():
             FROM postulaciones p
             JOIN egresados eg ON p.egresado_id = eg.id
             WHERE p.estado = 'seleccionado'
-            AND p.fecha_estado_actual > NOW() - INTERVAL '%s months'
+            AND p.fecha_estado_actual > NOW() - (%s || ' months')::interval
             GROUP BY eg.carrera_principal
             ORDER BY contrataciones DESC
             LIMIT 10
@@ -608,7 +610,7 @@ def consulta_tendencia():
                 AVG(EXTRACT(DAY FROM (fecha_estado_actual - fecha_postulacion)))::int as tiempo_promedio
             FROM postulaciones
             WHERE estado = 'seleccionado'
-            AND fecha_estado_actual > NOW() - INTERVAL '%s months'
+            AND fecha_estado_actual > NOW() - (%s || ' months')::interval
         """, (meses,))
         
         tiempo_promedio = cur.fetchone()[0]
