@@ -231,6 +231,43 @@ class Pago:
             row = cur.fetchone()
 
         return row[0] if row else None
+
+    @classmethod
+    def obtener_reporte_pagos(cls):
+        """Obtiene todos los pagos formateados para reporte Excel/PDF."""
+        with get_db_cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    p.id,
+                    p.codigo_voucher,
+                    u.email,
+                    p.concepto,
+                    p.monto,
+                    p.fecha_pago,
+                    p.pagado,
+                    p.validado
+                FROM pagos p
+                JOIN usuarios u ON p.usuario_id = u.id
+                ORDER BY p.fecha_pago DESC
+                """
+            )
+            rows = cur.fetchall()
+
+        pagos_data = []
+        for row in rows:
+            pagos_data.append({
+                "id": str(row[0]),
+                "codigo_voucher": row[1],
+                "email": row[2],
+                "concepto": row[3],
+                "monto": float(row[4]) if row[4] else 0,
+                "fecha_pago": row[5],
+                "pagado": row[6],
+                "validado": row[7],
+            })
+
+        return pagos_data
     
     @classmethod
     def crear_pago(cls, usuario_id, concepto, monto, referencia_id=None):

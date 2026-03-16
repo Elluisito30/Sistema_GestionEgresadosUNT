@@ -1079,3 +1079,199 @@ def generar_pdf_constancia(nombre_usuario, nombre_evento, fecha_evento):
     pdf_bytes = buffer.getvalue()
     buffer.close()
     return pdf_bytes
+
+
+def generar_pdf_reporte_pagos(pagos_data):
+    """Genera un PDF tabular profesional con reporte de pagos."""
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=landscape(A4))
+    width, height = landscape(A4)
+
+    _dibujar_marca_agua_unt(c, width, height)
+
+    c.setFont("Helvetica-Bold", 16)
+    c.drawCentredString(width/2, height - 2*cm, "UNIVERSIDAD NACIONAL DE TRUJILLO")
+    c.setFont("Helvetica-Bold", 12)
+    c.drawCentredString(width/2, height - 3*cm, "REPORTE DE PAGOS Y VOUCHERS")
+    c.setFont("Helvetica", 9)
+    c.drawCentredString(width/2, height - 3.5*cm, f"Generado el: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+
+    data = [["Código Voucher", "Usuario", "Concepto", "Monto (S/.)", "Fecha", "Pagado", "Validado"]]
+    for pago in pagos_data:
+        data.append([
+            str(pago.get("codigo_voucher", ""))[:20],
+            str(pago.get("email", ""))[:30],
+            str(pago.get("concepto", "")).upper(),
+            f"S/. {pago.get('monto', 0):.2f}",
+            pago.get("fecha_pago").strftime("%d/%m/%Y %H:%M") if hasattr(pago.get("fecha_pago"), "strftime") else str(pago.get("fecha_pago", "")),
+            "Sí" if pago.get("pagado") else "No",
+            "Sí" if pago.get("validado") else "No",
+        ])
+
+    table = Table(data, colWidths=[4*cm, 5*cm, 3.5*cm, 3*cm, 4*cm, 2*cm, 2*cm])
+    style = TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0056b3")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, 0), 9),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 10),
+        ("BACKGROUND", (0, 1), (-1, -1), colors.whitesmoke),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+        ("FONTSIZE", (0, 1), (-1, -1), 8),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ])
+    table.setStyle(style)
+
+    table.wrapOn(c, width, height)
+    table_height = 0.5 * cm * len(data)
+    table.drawOn(c, 1*cm, max(2*cm, height - 5*cm - table_height))
+
+    total_monto = sum(float(p.get("monto", 0)) for p in pagos_data)
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(1*cm, 1.8*cm, f"Total Ingresos: S/. {total_monto:,.2f}")
+    c.drawString(1*cm, 1.3*cm, f"Total Registros: {len(pagos_data)}")
+
+    c.setFont("Helvetica-Oblique", 8)
+    c.drawString(1*cm, 0.8*cm, "Documento generado automáticamente por el Sistema de Egresados UNT")
+
+    c.showPage()
+    c.save()
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+    return pdf_bytes
+
+
+def generar_pdf_resultados_encuestas(resultados_data, titulo_encuesta="Resultados de Encuesta"):
+    """Genera un PDF tabular profesional con resultados de encuestas."""
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=landscape(A4))
+    width, height = landscape(A4)
+
+    _dibujar_marca_agua_unt(c, width, height)
+
+    c.setFont("Helvetica-Bold", 16)
+    c.drawCentredString(width/2, height - 2*cm, "UNIVERSIDAD NACIONAL DE TRUJILLO")
+    c.setFont("Helvetica-Bold", 12)
+    c.drawCentredString(width/2, height - 3*cm, f"RESULTADOS: {titulo_encuesta.upper()}")
+    c.setFont("Helvetica", 9)
+    c.drawCentredString(width/2, height - 3.5*cm, f"Generado el: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+
+    data = [["Pregunta", "Tipo", "Respuesta", "Cantidad", "Porcentaje"]]
+    for item in resultados_data:
+        data.append([
+            str(item.get("texto_pregunta", ""))[:40],
+            str(item.get("tipo_respuesta", "")),
+            str(item.get("respuesta", ""))[:30],
+            str(int(item.get("cantidad", 0))),
+            f"{float(item.get('porcentaje', 0)):.1f}%",
+        ])
+
+    table = Table(data, colWidths=[8*cm, 3*cm, 6*cm, 2.5*cm, 2.5*cm])
+    style = TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0056b3")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, 0), 9),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 10),
+        ("BACKGROUND", (0, 1), (-1, -1), colors.whitesmoke),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+        ("FONTSIZE", (0, 1), (-1, -1), 8),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ])
+    table.setStyle(style)
+
+    table.wrapOn(c, width, height)
+    table_height = 0.5 * cm * len(data)
+    table.drawOn(c, 1*cm, max(2*cm, height - 5*cm - table_height))
+
+    total_respuestas = sum(int(item.get("cantidad", 0)) for item in resultados_data)
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(1*cm, 1.8*cm, f"Total Respuestas: {total_respuestas}")
+
+    c.setFont("Helvetica-Oblique", 8)
+    c.drawString(1*cm, 0.8*cm, "Documento generado automáticamente por el Sistema de Egresados UNT")
+
+    c.showPage()
+    c.save()
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+    return pdf_bytes
+
+
+def generar_pdf_reporte_generico(datos_list, titulo_reporte="Reporte de Búsqueda"):
+    """Genera un PDF tabular profesional para cualquier tipo de reporte."""
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=landscape(A4))
+    width, height = landscape(A4)
+
+    _dibujar_marca_agua_unt(c, width, height)
+
+    c.setFont("Helvetica-Bold", 16)
+    c.drawCentredString(width/2, height - 2*cm, "UNIVERSIDAD NACIONAL DE TRUJILLO")
+    c.setFont("Helvetica-Bold", 12)
+    c.drawCentredString(width/2, height - 3*cm, titulo_reporte.upper())
+    c.setFont("Helvetica", 9)
+    c.drawCentredString(width/2, height - 3.5*cm, f"Generado el: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+
+    if not datos_list:
+        c.setFont("Helvetica", 11)
+        c.drawString(2*cm, height - 5*cm, "No hay datos para mostrar")
+        c.showPage()
+        c.save()
+        pdf_bytes = buffer.getvalue()
+        buffer.close()
+        return pdf_bytes
+
+    # Obtener columnas del primer registro
+    columnas = list(datos_list[0].keys()) if datos_list else []
+    
+    # Limitar cantidad de columnas para que quepa en página landscape
+    if len(columnas) > 7:
+        columnas = columnas[:7]
+
+    data = [columnas]
+    for item in datos_list:
+        fila = []
+        for col in columnas:
+            valor = item.get(col, "")
+            # Convertir a string y truncar si es muy largo
+            valor_str = str(valor)[:40] if valor else ""
+            fila.append(valor_str)
+        data.append(fila)
+
+    # Calcular ancho de columnas dinámicamente
+    col_widths = [width / len(columnas) - 0.5*cm for _ in columnas]
+    
+    table = Table(data, colWidths=col_widths)
+    style = TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0056b3")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, 0), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
+        ("BACKGROUND", (0, 1), (-1, -1), colors.whitesmoke),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+        ("FONTSIZE", (0, 1), (-1, -1), 7),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ])
+    table.setStyle(style)
+
+    table.wrapOn(c, width, height)
+    table_height = 0.4 * cm * len(data)
+    table.drawOn(c, 0.5*cm, max(2*cm, height - 5*cm - table_height))
+
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(1*cm, 1.8*cm, f"Total Registros: {len(datos_list)}")
+
+    c.setFont("Helvetica-Oblique", 8)
+    c.drawString(1*cm, 0.8*cm, "Documento generado automáticamente por el Sistema de Egresados UNT")
+
+    c.showPage()
+    c.save()
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+    return pdf_bytes
+

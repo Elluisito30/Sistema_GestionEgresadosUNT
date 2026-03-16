@@ -13,6 +13,7 @@ from src.utils.database import get_db_cursor
 from src.utils.pdf_generator import generar_pdf_voucher_pago
 from src.utils.qr_generator import QRGenerator
 from src.utils.session import add_notification
+from src.utils.excel_generator import generar_excel_pagos
 
 
 def show():
@@ -315,6 +316,33 @@ def mostrar_todos_pagos():
     col1.metric("Total Recaudado", f"S/. {total_recaudado:,.2f}")
     col2.metric("Total Pagos", total_pagos)
     col3.metric("Pendientes Validación", len(df[df["Validado"] == False]))
+
+    st.markdown("---")
+    
+    col_dl1, col_dl2, col_dl3 = st.columns([1, 1, 4])
+    with col_dl1:
+        pagos_reporte = Pago.obtener_reporte_pagos()
+        excel_bytes = generar_excel_pagos(pagos_reporte)
+        st.download_button(
+            "📊 Descargar Excel",
+            data=excel_bytes,
+            file_name=f"reporte_pagos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
+    
+    with col_dl2:
+        from src.utils.pdf_generator import generar_pdf_reporte_pagos
+        pdf_bytes = generar_pdf_reporte_pagos(pagos_reporte)
+        st.download_button(
+            "📄 Descargar PDF",
+            data=pdf_bytes,
+            file_name=f"reporte_pagos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+        )
+
+    st.markdown("---")
 
     df["Monto"] = df["Monto"].apply(lambda x: f"S/. {x:,.2f}")
     df["Fecha"] = pd.to_datetime(df["Fecha"]).dt.strftime("%d/%m/%Y")

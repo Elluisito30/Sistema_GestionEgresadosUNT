@@ -9,6 +9,7 @@ import streamlit as st
 
 from src.utils.database import get_db_cursor
 from src.utils.session import add_notification
+from src.utils.excel_generator import generar_excel_resultados_busqueda
 
 def show():
     """Muestra la página de consultas avanzadas."""
@@ -672,12 +673,33 @@ def consulta_sql_personalizada():
             st.error("Solo se permiten consultas SELECT")
 
 def exportar_resultados(df, nombre_base):
-    """Exporta resultados a CSV."""
+    """Exporta resultados a Excel y PDF."""
     
-    import io
-    import base64
+    st.markdown("---")
+    st.subheader("📥 Descargar Resultados")
     
-    csv = df.to_csv(index=False)
-    b64 = base64.b64encode(csv.encode()).decode()
-    href = f'<a href="data:text/csv;base64,{b64}" download="{nombre_base}_{date.today()}.csv">Descargar CSV</a>'
-    st.markdown(href, unsafe_allow_html=True)
+    # Convertir DataFrame a lista de diccionarios para la utilidad de Excel
+    datos_dict = df.to_dict('records')
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        excel_bytes = generar_excel_resultados_busqueda(datos_dict, titulo_reporte=f"REPORTE {nombre_base.upper()}")
+        st.download_button(
+            "📊 Excel",
+            data=excel_bytes,
+            file_name=f"{nombre_base}_{date.today()}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
+    
+    with col2:
+        from src.utils.pdf_generator import generar_pdf_reporte_generico
+        pdf_bytes = generar_pdf_reporte_generico(datos_dict, titulo_reporte=f"Reporte {nombre_base}")
+        st.download_button(
+            "📄 PDF",
+            data=pdf_bytes,
+            file_name=f"{nombre_base}_{date.today()}.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+        )
