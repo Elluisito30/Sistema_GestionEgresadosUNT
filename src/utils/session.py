@@ -184,3 +184,13 @@ def get_filter(key, default=None):
 def clear_filters():
     """Limpia todos los filtros de la sesión."""
     st.session_state.filters = {}
+
+def get_session_id():
+    """Devuelve el ID del usuario en sesión."""
+    if st.session_state.get('authenticated') and st.session_state.user:
+        return st.session_state.user.get('id')
+    return None
+
+def is_admin():
+    """Verifica si el usuario en sesión es administrador."""
+    return st.session_state.get('user', {}).get('rol') == 'administrador'

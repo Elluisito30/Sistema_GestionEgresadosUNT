@@ -4,7 +4,7 @@ from datetime import datetime
 from src.utils.database import get_db_cursor
 from src.utils.session import render_notifications, add_notification
 from src.models.empresa import Empresa
-from src.utils.pdf_generator import generar_pdf_empresas_seleccionadas
+from src.utils.pdf_generator import generar_pdf_empresas_seleccionadas, generar_pdf_reporte_generico
 
 def show():
     """Muestra la página de gestión de empresas."""
@@ -12,12 +12,12 @@ def show():
     st.title("🏢 Gestión de Empresas")
     
     # Tabs para diferentes vistas
-    tab1, tab2, tab3, tab4 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "📋 Pendientes de Aprobación",
         "🏢 Directorio / Filtros",
-        "📊 Estadísticas"
-        ,
-        "➕ Crear Empresa"
+        "📊 Estadísticas",
+        "➕ Crear Empresa",
+        "✏️ Editar Empresa"
     ])
     
     with tab1:
@@ -31,6 +31,9 @@ def show():
 
     with tab4:
         crear_empresa_admin()
+
+    with tab5:
+        editar_empresa_admin()
 
 def mostrar_empresas_pendientes():
     """Muestra las empresas pendientes de aprobación."""
@@ -89,9 +92,9 @@ def mostrar_empresas_activas():
             sectores = [r[0] for r in cur.fetchall()]
         sector = st.selectbox("Sector", options=["Todos"] + sectores, index=0)
 
-    # Query directa para soportar filtro por estado/sector sin cambiar modelos
+    # Lógica de Query (compartida entre visualización y reporte)
     query = """
-        SELECT id, ruc, razon_social, sector_economico, tamano_empresa, email_contacto, estado, fecha_registro
+        SELECT ruc, razon_social, sector_economico, tamano_empresa, email_contacto, estado
         FROM empresas
         WHERE 1=1
     """
@@ -113,16 +116,24 @@ def mostrar_empresas_activas():
         cols = [d[0] for d in cur.description]
         rows = [dict(zip(cols, r)) for r in cur.fetchall()]
 
-    empresas = [Empresa.get_by_id(r["id"]) for r in rows]
-    
-    if empresas:
+    # Botón para descargar reporte de lo que se está viendo (con filtros aplicados)
+    col_exp1, col_exp2 = st.columns([3, 1])
+    with col_exp2:
+        if rows:
+            pdf_bytes = generar_pdf_reporte_generico(rows, f"Directorio de Empresas ({estado})")
+            st.download_button(
+                "📄 Reporte PDF (Filtros actual)",
+                data=pdf_bytes,
+                file_name=f"Directorio_Empresas_{estado}_{datetime.now().strftime('%Y%m%d')}.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+                key="btn_export_all_empresas"
+            )
+
+    if rows:
         # Crear DataFrame con selección múltiple
-        data = []
-        for e in empresas:
-            d = e.to_dict()
-            d["seleccionar"] = False
-            data.append(d)
-        df = pd.DataFrame(data)
+        df = pd.DataFrame(rows)
+        df["seleccionar"] = False
         
         # Selección de columnas para mostrar
         cols_display = ['seleccionar', 'ruc', 'razon_social', 'sector_economico', 'tamano_empresa', 'email_contacto', 'estado']
@@ -141,22 +152,12 @@ def mostrar_empresas_activas():
             hide_index=True
         )
 
-        # Exportación múltiple a PDF
+        # Exportación múltiple a PDF (lógica simplificada)
         seleccionadas = edited[edited["seleccionar"] == True]  # noqa: E712
         if not seleccionadas.empty:
-            empresas_sel = []
-            for _, row in seleccionadas.iterrows():
-                empresas_sel.append(
-                    {
-                        "ruc": row.get("ruc"),
-                        "razon_social": row.get("razon_social"),
-                        "sector_economico": row.get("sector_economico"),
-                        "tamano_empresa": row.get("tamano_empresa"),
-                        "estado": row.get("estado"),
-                    }
-                )
+            empresas_sel = seleccionadas[['ruc', 'razon_social', 'sector_economico', 'tamano_empresa', 'estado']].to_dict('records')
 
-            # KPIs del grupo
+            # KPIs del grupo (reusando lógica existente)
             kpis = {
                 "total": len(empresas_sel),
                 "activas": sum(1 for e in empresas_sel if e.get("estado") == "activa"),
@@ -178,35 +179,52 @@ def mostrar_empresas_activas():
                 file_name="Empresas_seleccionadas.pdf",
                 mime="application/pdf",
                 use_container_width=True,
+                key="btn_export_sel_empresas"
             )
         
         # Ver detalles individuales + ficha PDF por empresa
+        # Reusamos los IDs de 'rows' que ya tenemos
+        with get_db_cursor() as cur:
+            # Necesitamos los IDs originales para ver detalles
+            cur.execute(query.replace("ruc, razon_social, sector_economico, tamano_empresa, email_contacto, estado", "id, ruc, razon_social"), params)
+            empresas_ids = {r[1]: (r[0], r[2]) for r in cur.fetchall()}
+
         selected_ruc = st.selectbox(
             "Seleccione una empresa para ver detalles:",
-            options=[e.ruc for e in empresas],
-            format_func=lambda r: next(e.razon_social for e in empresas if e.ruc == r),
+            options=list(empresas_ids.keys()),
+            format_func=lambda r: empresas_ids[r][1],
         )
 
         if selected_ruc:
-            emp = next(e for e in empresas if e.ruc == selected_ruc)
-            with st.expander(f"Detalles de {emp.razon_social}", expanded=True):
+            emp_id, emp_nombre = empresas_ids[selected_ruc]
+            with st.expander(f"Detalles de {emp_nombre}", expanded=True):
                 col_a, col_b = st.columns([2, 1])
                 with col_a:
-                    mostrar_detalles_empresa(emp.id)
+                    mostrar_detalles_empresa(emp_id)
                 with col_b:
-                    ok, ficha_pdf = emp.generar_ficha_pdf()
+                    # Obtenemos el objeto Empresa real para generar su ficha
+                    emp_obj = Empresa.get_by_id(emp_id)
+                    
+                    # Botón para editar (Admin)
+                    if st.button("✏️ Editar Información", key=f"btn_edit_{emp_id}", use_container_width=True):
+                        st.session_state.admin_editing_empresa_id = emp_id
+                        st.session_state.current_tab = 4 # Tab 5 (índice 4)
+                        st.rerun()
+
+                    ok, ficha_pdf = emp_obj.generar_ficha_pdf()
                     if ok:
                         st.download_button(
-                            "📄 Ficha PDF",
+                            "📄 Ficha PDF Individual",
                             data=ficha_pdf,
-                            file_name=f"Ficha_Empresa_{emp.razon_social}.pdf",
+                            file_name=f"Ficha_Empresa_{emp_nombre}.pdf",
                             mime="application/pdf",
                             use_container_width=True,
+                            key=f"btn_ficha_pdf_{emp_id}"
                         )
                     else:
                         st.caption(str(ficha_pdf))
     else:
-        st.warning("No se encontraron empresas activas.")
+        st.warning("No se encontraron empresas con los filtros seleccionados.")
 
 
 def crear_empresa_admin():
@@ -389,6 +407,100 @@ def mostrar_estadisticas_empresas():
             )
         else:
             st.info("No hay datos de tamaño para mostrar.")
+
+def editar_empresa_admin():
+    """Formulario de edición de empresa (solo admin)."""
+    user = st.session_state.user
+    if user.get("rol") != "administrador":
+        st.warning("🔒 Solo administradores pueden editar empresas desde aquí.")
+        return
+
+    st.subheader("✏️ Editar información de empresa")
+    
+    # Selección de empresa a editar
+    empresa_id = st.session_state.get("admin_editing_empresa_id")
+    
+    with get_db_cursor() as cur:
+        cur.execute("SELECT id, razon_social, ruc FROM empresas ORDER BY razon_social ASC")
+        empresas_list = cur.fetchall()
+        
+    if not empresas_list:
+        st.info("No hay empresas registradas.")
+        return
+        
+    empresa_options = {r[0]: f"{r[1]} ({r[2]})" for r in empresas_list}
+    
+    # Si no hay una empresa seleccionada desde el directorio, mostrar selector
+    selected_id = st.selectbox(
+        "Seleccione la empresa a editar",
+        options=list(empresa_options.keys()),
+        format_func=lambda x: empresa_options[x],
+        index=list(empresa_options.keys()).index(empresa_id) if empresa_id in empresa_options else 0,
+        key="admin_edit_empresa_selector"
+    )
+    
+    if selected_id:
+        emp = Empresa.get_by_id(selected_id)
+        if emp:
+            with st.form("form_editar_empresa_admin"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    ruc = st.text_input("RUC *", value=emp.ruc)
+                    razon_social = st.text_input("Razón social *", value=emp.razon_social)
+                    nombre_comercial = st.text_input("Nombre comercial", value=emp.nombre_comercial or "")
+                    sector = st.text_input("Sector económico", value=emp.sector_economico or "")
+                with col2:
+                    tamano = st.selectbox(
+                        "Tamaño", 
+                        options=["micro", "pequeña", "mediana", "grande"],
+                        index=["micro", "pequeña", "mediana", "grande"].index(emp.tamano_empresa) if emp.tamano_empresa in ["micro", "pequeña", "mediana", "grande"] else 0
+                    )
+                    direccion = st.text_input("Dirección", value=emp.direccion or "")
+                    telefono = st.text_input("Teléfono", value=emp.telefono_contacto or "")
+                    email = st.text_input("Email de contacto", value=emp.email_contacto or "")
+                    web = st.text_input("Sitio web", value=emp.sitio_web or "")
+                    logo = st.text_input("URL del Logo", value=emp.logo_url or "")
+                
+                estado = st.selectbox(
+                    "Estado de la empresa",
+                    options=["activa", "pendiente", "rechazada"],
+                    index=["activa", "pendiente", "rechazada"].index(emp.estado) if emp.estado in ["activa", "pendiente", "rechazada"] else 0
+                )
+
+                col_btn1, col_btn2 = st.columns(2)
+                with col_btn1:
+                    submitted = st.form_submit_button("💾 Guardar Cambios", use_container_width=True)
+                with col_btn2:
+                    cancelar = st.form_submit_button("❌ Cancelar", use_container_width=True)
+
+                if submitted:
+                    if not ruc or not razon_social:
+                        st.error("RUC y Razón social son obligatorios.")
+                        return
+                    
+                    emp.ruc = ruc
+                    emp.razon_social = razon_social
+                    emp.nombre_comercial = nombre_comercial
+                    emp.sector_economico = sector
+                    emp.tamano_empresa = tamano
+                    emp.direccion = direccion
+                    emp.telefono_contacto = telefono
+                    emp.email_contacto = email
+                    emp.sitio_web = web
+                    emp.estado = estado
+                    emp.logo_url = logo
+                    
+                    ok, msg = emp.save()
+                    if ok:
+                        add_notification("Empresa actualizada correctamente.", "success")
+                        st.session_state.pop("admin_editing_empresa_id", None)
+                        st.rerun()
+                    else:
+                        st.error(msg)
+                
+                if cancelar:
+                    st.session_state.pop("admin_editing_empresa_id", None)
+                    st.rerun()
 
 def mostrar_detalles_empresa(empresa_id):
     """Reutiliza la lógica de detalles del modelo y vista."""

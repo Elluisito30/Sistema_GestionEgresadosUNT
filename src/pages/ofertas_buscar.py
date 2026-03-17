@@ -148,7 +148,10 @@ def buscar_ofertas():
         params.append(filtros['fecha_hasta'])
     
     query += """
-        GROUP BY o.id, e.razon_social, e.logo_url
+        GROUP BY 
+            o.id, o.titulo, o.descripcion, o.tipo, o.modalidad, o.salario_min, 
+            o.salario_max, o.fecha_publicacion, o.fecha_limite_postulacion, 
+            o.requisitos, o.ubicacion, e.razon_social, e.ruc, e.logo_url, e.sitio_web
         ORDER BY o.fecha_publicacion DESC
         LIMIT 50
     """

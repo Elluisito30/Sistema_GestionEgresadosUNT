@@ -1,471 +1,148 @@
 -- =====================================================
--- SCRIPT DE DATOS DE PRUEBA - SISTEMA DE EGRESADOS UNT
+-- SCRIPT DE DATOS INICIALES (SEED) - SISTEMA DE EGRESADOS UNT
 -- =====================================================
+-- Limpiar tablas antes de insertar
+TRUNCATE TABLE
+    usuarios, egresados, empresas, empleadores, ofertas, postulaciones, 
+    eventos, pagos, inscripciones_eventos, historial_laboral, educacion_continua, 
+    encuestas, preguntas_encuesta, respuestas_encuesta, notificaciones, 
+    chat_eventos, bitacora_auditoria
+RESTART IDENTITY CASCADE;
 
--- Insertar roles de usuario (si no se usan ENUMs)
--- INSERT INTO roles (nombre) VALUES ('administrador'), ('egresado'), ('empleador');
-
--- Insertar usuarios de prueba
--- Nota: Las contraseñas están hasheadas con bcrypt. La contraseña es el nombre + '123'
--- Ejemplo: admin123, juan123, etc.
-
--- Administrador
+-- =====================================================
+--  USUARIOS (8)
+-- =====================================================
+-- Esquema de Passwords: <primer_nombre>123
 INSERT INTO usuarios (id, email, password_hash, rol, email_confirmado, activo) VALUES
-(
-    '11111111-1111-1111-1111-111111111111',
-    'admin@unitru.edu.pe',
-    '$2b$12$mz4oGy4BEI9iDs3o5vwrO.A0R9Y1H.nx9GczuRZYAW6Nm46vnqUry', -- admin123
-    'administrador',
-    TRUE,
-    TRUE
-);
+(1, 'admin@unitru.edu.pe', '$2b$12$C9Wxp7hoLkohW8NPQnsEae6BjvJKtCf7p4.vGw9C0H/.GJRyOaRxm', 'administrador', TRUE, TRUE),
+(2, 'juan.perez@unitru.edu.pe', '$2b$12$uK7qG4ZYvzZPgHKYHgLIDevRfcuKrSMstFpgoQxTI6scWg9Oamqgy', 'egresado', TRUE, TRUE),
+(3, 'rrhh@techandina.com', '$2b$12$IyOnKPfcu9OQjhvqQMMSWuRE09Z2jmb4jzR.HwzNYiXi3QCbf1EZ6', 'empleador', TRUE, TRUE),
+(4, 'ana.garcia@unitru.edu.pe', '$2b$12$BCdlYhWdLP4Cn9eDU5KO3OuzT/r52dIvydlxt5CDTyDcH295bQHt.', 'egresado', TRUE, TRUE),
+(5, 'luis.rojas@unitru.edu.pe', '$2b$12$fc4XxLzM9bga6erd09DBeOJq1llj7BkdyxZ/YWOmo4lfGFzQfKTAG', 'egresado', TRUE, TRUE),
+(6, 'maria.lopez@unitru.edu.pe', '$2b$12$UwqQhWD9j6ZQ.C3/1u3lFOsnEvev482q.jtGz9/rPypNOZ5OMf4QK', 'egresado', TRUE, TRUE),
+(7, 'pedro.sanchez@unitru.edu.pe', '$2b$12$kIu0zJwP6T2eHGL0wFlPHOExqRmW/iuqCvcVY3x/YFfRz.8eQ9LhK', 'egresado', TRUE, TRUE),
+(8, 'contacto@minerals.pe', '$2b$12$xMZDCjbdlYdW7uYf6fHW3e.ffEX2BqZQU6EKvUZcxY.0Lz6jpFoqy', 'empleador', TRUE, TRUE);
 
--- Egresados
-INSERT INTO usuarios (id, email, password_hash, rol, email_confirmado, activo) VALUES
-(
-    '22222222-2222-2222-2222-222222222222',
-    'juan.perez@unitru.edu.pe',
-    '$2b$12$GzyTAxacPo/ZRvTadyeyD.JkinOyFb0jQXIcE96GRT9TA8zSLPeLK', -- juan123
-    'egresado',
-    TRUE,
-    TRUE
-),
-(
-    '33333333-3333-3333-3333-333333333333',
-    'maria.lopez@unitru.edu.pe',
-    '$2b$12$iI7I9ky8y.GJ/gz16jf8UOXQZmVx1bM43KU5XcslRg0wnsGg/caAC', -- maria123
-    'egresado',
-    TRUE,
-    TRUE
-),
-(
-    '44444444-4444-4444-4444-444444444444',
-    'carlos.rodriguez@unitru.edu.pe',
-    '$2b$12$vO18vjQfG3/r1HKBCRaDke/BwjsZxZ7VGPGTZ.bAqOyD3y8MD2jE2', -- carlos123
-    'egresado',
-    TRUE,
-    TRUE
-);
+-- =====================================================
+--  EMPRESAS (5)
+-- =====================================================
+INSERT INTO empresas (id, ruc, razon_social, nombre_comercial, sector_economico, tamano_empresa, estado, aprobado_por) VALUES
+(1, '20123456789', 'Tech Andina S.A.C.', 'TechAndina', 'Tecnología', 'mediana', 'activa', 1),
+(2, '20987654321', 'Minerals Corp Perú S.A.', 'Minerals Corp', 'Minería', 'grande', 'activa', 1),
+(3, '20555444333', 'Agroindustrias del Norte S.R.L.', 'AgroNorte', 'Agroindustria', 'grande', 'activa', 1),
+(4, '20111222333', 'Consultores Financieros Asociados', 'ConFin', 'Finanzas', 'pequeña', 'pendiente', NULL),
+(5, '20777888999', 'SaludTotal Clínica Internacional', 'SaludTotal', 'Salud', 'grande', 'rechazada', 1);
 
--- Empresas
-INSERT INTO empresas (id, ruc, razon_social, nombre_comercial, sector_economico, 
-                      tamano_empresa, direccion, telefono_contacto, email_contacto, 
-                      sitio_web, estado) VALUES
-(
-    '55555555-5555-5555-5555-555555555555',
-    '20123456789',
-    'Tecnología Andina S.A.C.',
-    'TechAndina',
-    'Tecnología',
-    'mediana',
-    'Av. España 123, Trujillo',
-    '044-123456',
-    'contacto@techandina.com',
-    'www.techandina.com',
-    'activa'
-),
-(
-    '66666666-6666-6666-6666-666666666666',
-    '20456789012',
-    'Clínica San Pablo S.A.C.',
-    'San Pablo Salud',
-    'Salud',
-    'grande',
-    'Av. América Sur 456, Trujillo',
-    '044-789012',
-    'rrhh@sanpablo.com',
-    'www.sanpablo.com',
-    'activa'
-),
-(
-    '77777777-7777-7777-7777-777777777777',
-    '20567890123',
-    'Constructora Norte S.A.C.',
-    'Conorte',
-    'Construcción',
-    'pequeña',
-    'Calle Bolívar 789, Trujillo',
-    '044-345678',
-    'info@conorte.com',
-    'www.conorte.com',
-    'pendiente'
-);
+-- =====================================================
+--  PERFILES (5 Egresados, 2 Empleadores)
+-- =====================================================
+INSERT INTO egresados (id, usuario_id, nombres, apellido_paterno, apellido_materno, dni, carrera_principal, facultad, anio_egreso) VALUES
+(1, 2, 'Juan', 'Perez', 'Garcia', '12345678', 'Ingeniería de Sistemas', 'Facultad de Ingeniería', 2023),
+(2, 4, 'Ana', 'Garcia', 'Torres', '87654321', 'Administración', 'Facultad de Ciencias Económicas', 2022),
+(3, 5, 'Luis', 'Rojas', 'Mendoza', '11223344', 'Ingeniería Industrial', 'Facultad de Ingeniería', 2021),
+(4, 6, 'Maria', 'Lopez', 'Silva', '44332211', 'Contabilidad', 'Facultad de Ciencias Económicas', 2023),
+(5, 7, 'Pedro', 'Sanchez', 'Quispe', '55667788', 'Ingeniería de Sistemas', 'Facultad de Ingeniería', 2022);
 
--- Empleadores (usuarios de empresas)
 INSERT INTO empleadores (id, usuario_id, empresa_id, nombres, apellidos, cargo, es_administrador_empresa) VALUES
-(
-    '88888888-8888-8888-8888-888888888888',
-    '11111111-1111-1111-1111-111111111111', -- Este es el admin, pero también podría ser empleador
-    '55555555-5555-5555-5555-555555555555',
-    'Roberto',
-    'García Mendoza',
-    'Gerente de RRHH',
-    TRUE
-);
-
--- Crear usuarios para empleadores (primero insertar en usuarios)
-INSERT INTO usuarios (id, email, password_hash, rol, email_confirmado, activo) VALUES
-(
-    '99999999-9999-9999-9999-999999999999',
-    'rrhh@techandina.com',
-    '$2b$12$K.xAfE5ns1vq2yADPfLnZuE4TnFS0ugcK.s78E0tTHRLAOSB23NKG', -- empleador123
-    'empleador',
-    TRUE,
-    TRUE
-),
-(
-    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-    'seleccion@sanpablo.com',
-    '$2b$12$K.xAfE5ns1vq2yADPfLnZuE4TnFS0ugcK.s78E0tTHRLAOSB23NKG', -- empleador123
-    'empleador',
-    TRUE,
-    TRUE
-);
-
--- Agregar los empleadores restantes
-INSERT INTO empleadores (id, usuario_id, empresa_id, nombres, apellidos, cargo, es_administrador_empresa) VALUES
-(
-    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-    '99999999-9999-9999-9999-999999999999',
-    '55555555-5555-5555-5555-555555555555',
-    'Ana',
-    'Martínez López',
-    'Coordinadora de Selección',
-    FALSE
-),
-(
-    'cccccccc-cccc-cccc-cccc-cccccccccccc',
-    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-    '66666666-6666-6666-6666-666666666666',
-    'Pedro',
-    'Sánchez Torres',
-    'Jefe de Personal',
-    TRUE
-);
-
--- Datos de egresados
-INSERT INTO egresados (id, usuario_id, nombres, apellido_paterno, apellido_materno,
-                      dni, fecha_nacimiento, telefono, direccion, carrera_principal,
-                      facultad, anio_egreso, perfil_publico) VALUES
-(
-    'dddddddd-dddd-dddd-dddd-dddddddddddd',
-    '22222222-2222-2222-2222-222222222222',
-    'Juan Carlos',
-    'Pérez',
-    'Gutiérrez',
-    '12345678',
-    '1995-05-15',
-    '987654321',
-    'Urb. Primavera Mz A Lt 12, Trujillo',
-    'Ingeniería de Sistemas',
-    'Ingeniería',
-    2018,
-    TRUE
-),
-(
-    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
-    '33333333-3333-3333-3333-333333333333',
-    'María Isabel',
-    'López',
-    'Fernández',
-    '23456789',
-    '1996-08-22',
-    '976543210',
-    'Av. Larco 456, Trujillo',
-    'Administración de Empresas',
-    'Ciencias Económicas',
-    2019,
-    TRUE
-),
-(
-    'ffffffff-ffff-ffff-ffff-ffffffffffff',
-    '44444444-4444-4444-4444-444444444444',
-    'Carlos Alberto',
-    'Rodríguez',
-    'Mendoza',
-    '34567890',
-    '1994-11-30',
-    '965432109',
-    'Calle San Martín 789, Trujillo',
-    'Contabilidad',
-    'Ciencias Económicas',
-    2017,
-    FALSE
-);
-
--- Ofertas laborales
-INSERT INTO ofertas (id, empresa_id, publicado_por, titulo, descripcion, requisitos,
-                    tipo, modalidad, ubicacion, salario_min, salario_max,
-                    fecha_publicacion, fecha_limite_postulacion, activa, carrera_objetivo) VALUES
-(
-    '11111111-1111-1111-1111-111111111111',
-    '55555555-5555-5555-5555-555555555555',
-    '88888888-8888-8888-8888-888888888888',
-    'Desarrollador Python Senior',
-    'Buscamos un desarrollador Python con experiencia en desarrollo web y análisis de datos para unirse a nuestro equipo de innovación.',
-    'Requisitos:
-    - Mínimo 3 años de experiencia con Python
-    - Conocimientos de Django/Flask
-    - Experiencia con bases de datos SQL
-    - Inglés intermedio
-    - Deseable conocimiento en Machine Learning',
-    'empleo',
-    'hibrido',
-    'Trujillo',
-    3500,
-    5000,
-    CURRENT_DATE - INTERVAL '5 days',
-    CURRENT_DATE + INTERVAL '25 days',
-    TRUE,
-    ARRAY['Ingeniería de Sistemas', 'Ingeniería Informática']
-),
-(
-    '22222222-2222-2222-2222-222222222222',
-    '66666666-6666-6666-6666-666666666666',
-    'cccccccc-cccc-cccc-cccc-cccccccccccc',
-    'Asistente Administrativo',
-    'Importante clínica busca asistente administrativo para área de admisión y archivo.',
-    'Requisitos:
-    - Egresado de Administración o carreras afines
-    - Conocimiento de Office
-    - Experiencia en atención al cliente
-    - Disponibilidad para trabajar en horarios rotativos',
-    'pasantia',
-    'presencial',
-    'Trujillo',
-    1025,
-    1200,
-    CURRENT_DATE - INTERVAL '2 days',
-    CURRENT_DATE + INTERVAL '15 days',
-    TRUE,
-    ARRAY['Administración de Empresas', 'Contabilidad']
-),
-(
-    '33333333-3333-3333-3333-333333333333',
-    '55555555-5555-5555-5555-555555555555',
-    '88888888-8888-8888-8888-888888888888',
-    'Prácticas en Desarrollo Web',
-    'Buscamos practicante de sistemas para apoyo en desarrollo de aplicaciones web.',
-    'Requisitos:
-    - Estudiante de últimos ciclos de Sistemas o Informática
-    - Conocimientos básicos de HTML, CSS, JavaScript
-    - Interés en aprender Django
-    - Horario flexible',
-    'practicas',
-    'remoto',
-    'Remoto',
-    800,
-    1000,
-    CURRENT_DATE - INTERVAL '10 days',
-    CURRENT_DATE + INTERVAL '10 days',
-    TRUE,
-    ARRAY['Ingeniería de Sistemas', 'Ingeniería Informática', 'Ciencias de la Computación']
-);
-
--- Postulaciones
-INSERT INTO postulaciones (id, oferta_id, egresado_id, estado, fecha_postulacion) VALUES
-(
-    '44444444-4444-4444-4444-444444444444',
-    '11111111-1111-1111-1111-111111111111',
-    'dddddddd-dddd-dddd-dddd-dddddddddddd',
-    'en_revision',
-    CURRENT_DATE - INTERVAL '4 days'
-),
-(
-    '55555555-5555-5555-5555-555555555555',
-    '11111111-1111-1111-1111-111111111111',
-    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
-    'recibido',
-    CURRENT_DATE - INTERVAL '2 days'
-),
-(
-    '66666666-6666-6666-6666-666666666666',
-    '22222222-2222-2222-2222-222222222222',
-    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
-    'entrevista',
-    CURRENT_DATE - INTERVAL '6 days'
-);
-
--- Eventos (Fechas actualizadas a 2026 para pruebas)
-INSERT INTO eventos (id, publicado_por, titulo, descripcion, tipo,
-                    fecha_inicio, fecha_fin, lugar, capacidad_maxima,
-                    es_gratuito, precio, activo) VALUES
-(
-    '99999999-9999-9999-9999-999999999999',
-    '11111111-1111-1111-1111-111111111111',
-    'Seminario de Liderazgo y Empleabilidad 2026',
-    'Un evento magistral enfocado en las nuevas tendencias del mercado laboral y el desarrollo de habilidades blandas para egresados de la UNT.',
-    'webinar',
-    NOW() - INTERVAL '2 days',
-    NOW() - INTERVAL '1 day',
-    'Plataforma Zoom Institucional',
-    100,
-    TRUE,
-    NULL,
-    TRUE
-),
-(
-    '88888888-8888-8888-8888-888888888888',
-    '11111111-1111-1111-1111-111111111111',
-    'Feria Laboral de Ingeniería 2026',
-    'Conecta con las mejores empresas del sector tecnológico e industrial. Trae tu CV actualizado.',
-    'feria_laboral',
-    NOW() + INTERVAL '7 days',
-    NOW() + INTERVAL '7 days' + INTERVAL '8 hours',
-    'Coliseo Multiusos UNT',
-    500,
-    TRUE,
-    NULL,
-    TRUE
-),
-(
-    '77777777-7777-7777-7777-777777777777',
-    '11111111-1111-1111-1111-111111111111',
-    'Taller: Estrategias de Networking en LinkedIn',
-    'Aprende a potenciar tu perfil profesional y generar contactos de valor en la red profesional más grande del mundo.',
-    'curso',
-    NOW() - INTERVAL '1 hour',
-    NOW() + INTERVAL '2 hours',
-    'Plataforma Microsoft Teams',
-    50,
-    FALSE,
-    50.00,
-    TRUE
-);
-
--- Inscripciones a eventos
-INSERT INTO inscripciones_eventos (id, evento_id, usuario_id, fecha_inscripcion, asistio) VALUES
-(
-    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-    '99999999-9999-9999-9999-999999999999',
-    '22222222-2222-2222-2222-222222222222',
-    NOW() - INTERVAL '3 days',
-    TRUE
-),
-(
-    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-    '77777777-7777-7777-7777-777777777777',
-    '22222222-2222-2222-2222-222222222222',
-    NOW() - INTERVAL '2 days',
-    FALSE
-);
-
--- Historial laboral
-INSERT INTO historial_laboral (id, egresado_id, empresa_nombre, puesto,
-                              fecha_inicio, fecha_fin, es_trabajo_actual,
-                              descripcion) VALUES
-(
-    'cccccccc-cccc-cccc-cccc-cccccccccccc',
-    'dddddddd-dddd-dddd-dddd-dddddddddddd',
-    'TechSolutions S.A.C.',
-    'Desarrollador Junior',
-    '2019-01-15',
-    '2021-03-30',
-    FALSE,
-    'Desarrollo de aplicaciones web con Python y Django'
-),
-(
-    'dddddddd-dddd-dddd-dddd-dddddddddddd',
-    'dddddddd-dddd-dddd-dddd-dddddddddddd',
-    'Innovación Digital S.A.C.',
-    'Desarrollador Semi-Senior',
-    '2021-04-01',
-    NULL,
-    TRUE,
-    'Líder de equipo de desarrollo backend'
-);
-
--- Educación continua
-INSERT INTO educacion_continua (id, egresado_id, institucion, titulo_curso,
-                               nivel, fecha_inicio, fecha_fin) VALUES
-(
-    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
-    'dddddddd-dddd-dddd-dddd-dddddddddddd',
-    'Universidad Nacional de Ingeniería',
-    'Diplomado en Ciencia de Datos',
-    'diplomado',
-    '2022-01-10',
-    '2022-07-15'
-),
-(
-    'ffffffff-ffff-ffff-ffff-ffffffffffff',
-    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
-    'ESAN',
-    'Maestría en Administración de Empresas',
-    'maestria',
-    '2021-03-01',
-    NULL
-);
-
--- Encuestas
-INSERT INTO encuestas (id, titulo, descripcion, fecha_inicio, fecha_fin, activa, creada_por) VALUES
-(
-    '11111111-1111-1111-1111-111111111111',
-    'Encuesta de Seguimiento a Graduados 2024',
-    'Encuesta para conocer la situación laboral actual de nuestros egresados.',
-    CURRENT_DATE - INTERVAL '10 days',
-    CURRENT_DATE + INTERVAL '20 days',
-    TRUE,
-    '11111111-1111-1111-1111-111111111111'
-);
-
--- Preguntas de encuesta
-INSERT INTO preguntas_encuesta (id, encuesta_id, texto_pregunta, tipo_respuesta, opciones) VALUES
-(
-    '22222222-2222-2222-2222-222222222222',
-    '11111111-1111-1111-1111-111111111111',
-    '¿Cuál es su situación laboral actual?',
-    'opcion_multiple',
-    '["Trabajando tiempo completo", "Trabajando medio tiempo", "Buscando empleo", "Estudiando", "Independiente"]'
-),
-(
-    '33333333-3333-3333-3333-333333333333',
-    '11111111-1111-1111-1111-111111111111',
-    '¿Su trabajo actual está relacionado con su carrera?',
-    'opcion_multiple',
-    '["Sí, directamente relacionado", "Sí, parcialmente relacionado", "No está relacionado"]'
-),
-(
-    '44444444-4444-4444-4444-444444444444',
-    '11111111-1111-1111-1111-111111111111',
-    'Rango salarial mensual (en soles)',
-    'opcion_multiple',
-    '["Menos de 1000", "1000 - 2000", "2001 - 3000", "3001 - 5000", "Más de 5000"]'
-);
-
--- Notificaciones
-INSERT INTO notificaciones (id, usuario_id, tipo, asunto, mensaje, leida, fecha_creacion) VALUES
-(
-    '55555555-5555-5555-5555-555555555555',
-    '22222222-2222-2222-2222-222222222222',
-    'sistema',
-    'Nueva oferta recomendada',
-    'Hay nuevas ofertas de trabajo que coinciden con tu perfil',
-    FALSE,
-    NOW() - INTERVAL '1 day'
-),
-(
-    'aaaaaaaa-1111-2222-3333-444444444444',
-    '22222222-2222-2222-2222-222222222222',
-    'sistema',
-    'Actualización de postulación',
-    'Tu postulación a "Desarrollador Python Senior" ha pasado a estado "En revisión"',
-    TRUE,
-    NOW() - INTERVAL '2 days'
-);
-
--- Chat de Eventos (Networking)
-INSERT INTO chat_eventos (evento_id, usuario_id, mensaje, fecha_envio) VALUES
-('77777777-7777-7777-7777-777777777777', '11111111-1111-1111-1111-111111111111', 'Bienvenidos al taller de LinkedIn!', NOW() - INTERVAL '45 minutes'),
-('77777777-7777-7777-7777-777777777777', '22222222-2222-2222-2222-222222222222', 'Hola! Muchas gracias por el evento.', NOW() - INTERVAL '30 minutes');
-
--- Insertar registros en bitácora (Auditoría)
-INSERT INTO bitacora_auditoria (usuario_id, perfil_utilizado, accion, modulo, detalle, fecha_hora) VALUES
-('11111111-1111-1111-1111-111111111111', 'administrador', 'LOGIN', 'autenticacion', 'Login exitoso', NOW() - INTERVAL '1 day'),
-('22222222-2222-2222-2222-222222222222', 'egresado', 'LOGIN', 'autenticacion', 'Login exitoso', NOW() - INTERVAL '12 hours'),
-('22222222-2222-2222-2222-222222222222', 'egresado', 'ACCESO_MODULO', 'eventos', 'Usuario consultó el calendario de eventos', NOW() - INTERVAL '1 hour'),
-('11111111-1111-1111-1111-111111111111', 'administrador', 'CREACION', 'eventos', 'Se creó el evento: Seminario de Liderazgo', NOW() - INTERVAL '2 days');
+(1, 3, 1, 'Carlos', 'Rodriguez', 'Gerente de RRHH', TRUE),
+(2, 8, 2, 'Elena', 'Casas', 'Jefe de Reclutamiento', TRUE);
 
 -- =====================================================
--- FIN DEL SCRIPT DE DATOS DE PRUEBA
+--  OFERTAS LABORALES (10)
 -- =====================================================
+INSERT INTO ofertas (empresa_id, publicado_por, titulo, descripcion, tipo, modalidad, salario_min, salario_max, fecha_limite_postulacion, activa, carrera_objetivo) VALUES
+(1, 1, 'Desarrollador Backend Jr (Python)', 'Buscamos un desarrollador Python para nuestro equipo de microservicios.', 'empleo', 'remoto', 2500, 3500, '2026-04-15', TRUE, '{"Ingeniería de Sistemas", "Ingeniería de Software"}'),
+(1, 1, 'Analista de Datos Power BI', 'Creación de dashboards y reportes para el área comercial.', 'practicas', 'hibrido', 1200, 1500, '2026-03-30', TRUE, '{"Estadística", "Ingeniería Industrial"}'),
+(2, 1, 'Ingeniero de Seguridad Minera', 'Supervisión de protocolos de seguridad en operaciones.', 'empleo', 'presencial', 5000, 7000, '2026-05-01', TRUE, '{"Ingeniería de Minas", "Ingeniería Geológica"}'),
+(3, 1, 'Jefe de Control de Calidad', 'Asegurar la calidad de nuestros productos de exportación.', 'empleo', 'presencial', 4500, 6000, '2026-04-20', TRUE, '{"Ingeniería Agroindustrial", "Ingeniería Química"}'),
+(1, 1, 'Diseñador UX/UI Senior', 'Liderar el diseño de nuestra nueva app móvil.', 'empleo', 'remoto', 6000, 8000, '2026-03-25', FALSE, '{"Ciencias de la Comunicación"}'),
+(2, 1, 'Practicante de Geología', 'Apoyo en el mapeo y análisis de muestras.', 'pasantia', 'presencial', 1500, 1800, '2026-04-10', TRUE, '{"Ingeniería Geológica"}'),
+(3, 1, 'Asistente Contable', 'Registro de facturas y apoyo en declaraciones.', 'practicas', 'presencial', 1025, 1300, '2026-04-05', TRUE, '{"Contabilidad y Finanzas"}'),
+(1, 1, 'DevOps Engineer', 'Mantenimiento de infraestructura en AWS y CI/CD.', 'empleo', 'remoto', 7000, 9000, '2026-04-18', TRUE, '{"Ingeniería de Sistemas"}'),
+(2, 1, 'Supervisor de Medio Ambiente', 'Monitoreo de impacto ambiental en la unidad minera.', 'empleo', 'presencial', 5500, 7500, '2026-05-10', TRUE, '{"Ingeniería Ambiental"}'),
+(3, 1, 'Analista de Logística', 'Optimización de la cadena de suministro y exportaciones.', 'practicas', 'hibrido', 1300, 1600, '2026-04-01', FALSE, '{"Ingeniería Industrial"}');
+
+-- =====================================================
+--  POSTULACIONES (13)
+-- =====================================================
+INSERT INTO postulaciones (oferta_id, egresado_id, estado) VALUES
+(1, 1, 'recibido'), (2, 1, 'en_revision'), (7, 1, 'entrevista'), (5, 1, 'descartado'), (10, 1, 'recibido'),
+(1, 2, 'en_revision'), (8, 2, 'recibido'),
+(3, 3, 'recibido'), (9, 3, 'entrevista'),
+(4, 4, 'seleccionado'), (7, 4, 'en_revision'),
+(8, 5, 'recibido'), (1, 5, 'descartado');
+
+-- =====================================================
+--  EVENTOS (4)
+-- =====================================================
+INSERT INTO eventos (publicado_por, titulo, descripcion, tipo, fecha_inicio, fecha_fin, lugar, es_gratuito, precio) VALUES
+(1, 'Feria Laboral de Ingeniería 2026', 'Conecta con las mejores empresas de la región.', 'feria_laboral', '2026-04-25 09:00', '2026-04-26 18:00', 'Ciudad Universitaria UNT', TRUE, 0),
+(1, 'Webinar: Tu CV en la era de la IA', 'Aprende a optimizar tu CV con inteligencia artificial.', 'webinar', '2026-03-28 19:00', '2026-03-28 21:00', 'Online - Zoom', TRUE, 0),
+(1, 'Curso: Finanzas para Emprendedores', 'Conceptos clave para iniciar tu propio negocio.', 'curso', '2026-05-05 18:00', '2026-05-26 20:00', 'Online - Plataforma UNT', FALSE, 150.00),
+(1, 'Charla: El Futuro de la Minería Sostenible', 'Expertos de Minerals Corp comparten su visión.', 'charla', '2026-04-08 16:00', '2026-04-08 18:00', 'Auditorio de Geología', TRUE, 0);
+
+-- =====================================================
+--  INSCRIPCIONES A EVENTOS (3)
+-- =====================================================
+INSERT INTO inscripciones_eventos (evento_id, usuario_id) VALUES
+(1, 2), (2, 2), (4, 2);
+
+-- =====================================================
+--  HISTORIAL LABORAL Y ACADÉMICO
+-- =====================================================
+-- Juan Perez (ID 1)
+INSERT INTO historial_laboral (egresado_id, empresa_nombre, puesto, fecha_inicio, fecha_fin, es_trabajo_actual) VALUES
+(1, 'Bodega Don Pepe', 'Asistente de Caja', '2021-01-15', '2022-12-20', FALSE),
+(1, 'Tech Solutions S.R.L.', 'Practicante de Desarrollo Web', '2023-03-01', '2023-08-31', FALSE);
+
+INSERT INTO educacion_continua (egresado_id, institucion, titulo_curso, nivel, fecha_fin) VALUES
+(1, 'Platzi', 'Curso de Python Profesional', 'curso', '2023-11-10'),
+(1, 'Coderhouse', 'Diplomado en Data Science', 'diplomado', '2024-02-20');
+
+-- Ana Garcia (ID 2)
+INSERT INTO historial_laboral (egresado_id, empresa_nombre, puesto, fecha_inicio, fecha_fin, es_trabajo_actual) VALUES
+(2, 'Banco de la Nación', 'Asistente Administrativo', '2022-05-01', NULL, TRUE);
+
+INSERT INTO educacion_continua (egresado_id, institucion, titulo_curso, nivel, fecha_fin) VALUES
+(2, 'ESAN', 'Gestión Pública Moderna', 'curso', '2023-08-15');
+
+-- Luis Rojas (ID 3)
+INSERT INTO historial_laboral (egresado_id, empresa_nombre, puesto, fecha_inicio, fecha_fin, es_trabajo_actual) VALUES
+(3, 'Cervecería Backus', 'Analista de Procesos', '2021-02-10', '2023-12-30', FALSE);
+
+INSERT INTO educacion_continua (egresado_id, institucion, titulo_curso, nivel, fecha_fin) VALUES
+(3, 'PUCP', 'Lean Six Sigma Green Belt', 'diplomado', '2022-11-20');
+
+-- Maria Lopez (ID 4)
+INSERT INTO historial_laboral (egresado_id, empresa_nombre, puesto, fecha_inicio, fecha_fin, es_trabajo_actual) VALUES
+(4, 'Estudio Contable ABC', 'Auxiliar Contable', '2023-01-15', NULL, TRUE);
+
+-- Pedro Sanchez (ID 5)
+INSERT INTO historial_laboral (egresado_id, empresa_nombre, puesto, fecha_inicio, fecha_fin, es_trabajo_actual) VALUES
+(5, 'Siderperu', 'Desarrollador Jr', '2022-08-01', NULL, TRUE);
+
+-- =====================================================
+--  ENCUESTAS Y PREGUNTAS (2)
+-- =====================================================
+INSERT INTO encuestas (id, titulo, descripcion, fecha_inicio, fecha_fin, creada_por) VALUES
+(1, 'Encuesta de Satisfacción Anual 2025', 'Mide la satisfacción de los egresados con los servicios de la bolsa de trabajo.', '2025-12-01', '2025-12-31', 1);
+
+INSERT INTO preguntas_encuesta (encuesta_id, texto_pregunta, tipo_respuesta, opciones) VALUES
+(1, 'En una escala del 1 al 5, ¿qué tan útil ha sido la plataforma para tu desarrollo profesional?', 'escala', '["1", "2", "3", "4", "5"]'),
+(1, '¿Qué nueva funcionalidad te gustaría ver en el sistema?', 'texto', NULL);
+
+-- =====================================================
+--  REAJUSTE DE SECUENCIAS
+-- =====================================================
+SELECT setval('usuarios_id_seq', (SELECT MAX(id) FROM usuarios));
+SELECT setval('egresados_id_seq', (SELECT MAX(id) FROM egresados));
+SELECT setval('empresas_id_seq', (SELECT MAX(id) FROM empresas));
+SELECT setval('empleadores_id_seq', (SELECT MAX(id) FROM empleadores));
+SELECT setval('ofertas_id_seq', (SELECT MAX(id) FROM ofertas));
+SELECT setval('postulaciones_id_seq', (SELECT MAX(id) FROM postulaciones));
+SELECT setval('eventos_id_seq', (SELECT MAX(id) FROM eventos));
+SELECT setval('inscripciones_eventos_id_seq', (SELECT MAX(id) FROM inscripciones_eventos));
+SELECT setval('historial_laboral_id_seq', (SELECT MAX(id) FROM historial_laboral));
+SELECT setval('educacion_continua_id_seq', (SELECT MAX(id) FROM educacion_continua));
+SELECT setval('encuestas_id_seq', (SELECT MAX(id) FROM encuestas));
+SELECT setval('preguntas_encuesta_id_seq', (SELECT MAX(id) FROM preguntas_encuesta));

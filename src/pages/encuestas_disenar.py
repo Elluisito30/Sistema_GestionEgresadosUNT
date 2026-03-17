@@ -10,6 +10,7 @@ import streamlit as st
 
 from src.utils.database import get_db_cursor
 from src.utils.session import add_notification
+from src.utils.pdf_generator import generar_pdf_reporte_generico
 
 def show():
     """Muestra la página de diseño de encuestas."""
@@ -440,6 +441,34 @@ def mostrar_resultados_encuesta(encuesta_id):
         if descripcion:
             st.caption(descripcion)
         
+        # Botón para descargar reporte de resultados
+        col_res1, col_res2 = st.columns([3, 1])
+        with col_res2:
+            # Preparar datos resumen para PDF
+            cur.execute("""
+                SELECT p.texto_pregunta, r.respuesta, COUNT(*) as cantidad
+                FROM preguntas_encuesta p
+                JOIN respuestas_encuesta r ON p.id = r.pregunta_id
+                WHERE p.encuesta_id = %s
+                GROUP BY p.id, p.texto_pregunta, r.respuesta
+                ORDER BY p.id
+            """, (encuesta_id,))
+            resumen_data = [
+                {'Pregunta': row[0][:40], 'Respuesta': str(row[1])[:30], 'Cantidad': row[2]}
+                for row in cur.fetchall()
+            ]
+            
+            if resumen_data:
+                pdf_res = generar_pdf_reporte_generico(resumen_data, f"Resultados - {titulo}")
+                st.download_button(
+                    "📄 Descargar Reporte (PDF)",
+                    data=pdf_res,
+                    file_name=f"Resultados_Encuesta_{datetime.now().strftime('%Y%m%d')}.pdf",
+                    mime="application/pdf",
+                    key=f"btn_res_pdf_{encuesta_id}",
+                    use_container_width=True
+                )
+
         # Estadísticas generales
         cur.execute("""
             SELECT 

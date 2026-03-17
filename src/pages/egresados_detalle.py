@@ -27,6 +27,7 @@ def show():
         # Botón volver
         if st.button("⬅ Volver a Lista"):
             st.session_state.pop('detalle_egresado_id', None)
+            st.session_state.current_page = 'egresados_lista'
             st.rerun()
             
         st.markdown("---")

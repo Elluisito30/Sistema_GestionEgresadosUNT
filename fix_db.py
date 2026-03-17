@@ -1,35 +1,25 @@
-import psycopg2
-import sys
 
-conn_str = "postgres://postgres:300805@127.0.0.1:5432/postgres"
+from src.utils.database import get_db_cursor
 
-try:
-    conn = psycopg2.connect(conn_str)
-    conn.autocommit = True
-    cur = conn.cursor()
-    cur.execute("SELECT datname FROM pg_database;")
-    dbs = [row[0] for row in cur.fetchall()]
-    print("Databases:", dbs)
-    
-    target_db = None
-    for db in dbs:
-        if "bd_egresadosUNT" in db:
-            target_db = db
-            break
-            
-    if target_db and target_db != "bd_egresadosUNT":
-        print(f"Renaming '{target_db}' to 'bd_egresadosUNT'")
-        cur.execute(f'ALTER DATABASE "{target_db}" RENAME TO bd_egresadosUNT;')
-        print("Success!")
-    elif target_db == "bd_egresadosUNT":
-        print("Database is already named correctly.")
-    else:
-        print("Database not found. Creating it!")
-        cur.execute("CREATE DATABASE bd_egresadosUNT;")
-        print("Created!")
-        
-    cur.close()
-    conn.close()
-except Exception as e:
-    import traceback
-    traceback.print_exc()
+def fix_database():
+    print("Verificando existencia de tabla chat_eventos...")
+    try:
+        with get_db_cursor(commit=True) as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS chat_eventos (
+                    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                    evento_id UUID NOT NULL REFERENCES eventos(id) ON DELETE CASCADE,
+                    usuario_id UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+                    mensaje TEXT NOT NULL,
+                    fecha_envio TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                );
+                
+                CREATE INDEX IF NOT EXISTS idx_chat_evento_id ON chat_eventos(evento_id);
+                CREATE INDEX IF NOT EXISTS idx_chat_fecha_envio ON chat_eventos(fecha_envio);
+            """)
+            print("Tabla chat_eventos verificada/creada exitosamente.")
+    except Exception as e:
+        print(f"Error al crear la tabla: {e}")
+
+if __name__ == "__main__":
+    fix_database()

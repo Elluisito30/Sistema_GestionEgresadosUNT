@@ -110,6 +110,27 @@ class Evento:
             return cur.fetchall()
 
     @staticmethod
+    def _crear_tabla_chat():
+        """Crea la tabla chat_eventos si no existe."""
+        try:
+            with get_db_cursor(commit=True) as cur:
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS chat_eventos (
+                        id SERIAL PRIMARY KEY,
+                        evento_id INTEGER NOT NULL REFERENCES eventos(id) ON DELETE CASCADE,
+                        usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+                        mensaje TEXT NOT NULL,
+                        fecha_envio TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_chat_evento_id ON chat_eventos(evento_id);
+                    CREATE INDEX IF NOT EXISTS idx_chat_fecha_envio ON chat_eventos(fecha_envio);
+                """)
+                return True
+        except Exception as e:
+            print(f"Error al crear tabla chat_eventos: {e}")
+            return False
+
+    @staticmethod
     def enviar_mensaje_chat(evento_id, usuario_id, mensaje):
         """Envía un mensaje al chat del evento."""
         try:
@@ -120,18 +141,27 @@ class Evento:
                 """, (evento_id, usuario_id, mensaje))
                 return True, "Mensaje enviado"
         except Exception as e:
+            if "relation \"chat_eventos\" does not exist" in str(e):
+                if Evento._crear_tabla_chat():
+                    return Evento.enviar_mensaje_chat(evento_id, usuario_id, mensaje)
             return False, f"Error al enviar mensaje: {str(e)}"
 
     @staticmethod
     def get_mensajes_chat(evento_id, limit=100):
         """Obtiene los mensajes del chat de un evento."""
-        with get_db_cursor() as cur:
-            cur.execute("""
-                SELECT ce.mensaje, ce.fecha_envio, u.email, u.rol
-                FROM chat_eventos ce
-                JOIN usuarios u ON ce.usuario_id = u.id
-                WHERE ce.evento_id = %s
-                ORDER BY ce.fecha_envio ASC
-                LIMIT %s
-            """, (evento_id, limit))
-            return cur.fetchall()
+        try:
+            with get_db_cursor() as cur:
+                cur.execute("""
+                    SELECT ce.mensaje, ce.fecha_envio, u.email, u.rol
+                    FROM chat_eventos ce
+                    JOIN usuarios u ON ce.usuario_id = u.id
+                    WHERE ce.evento_id = %s
+                    ORDER BY ce.fecha_envio ASC
+                    LIMIT %s
+                """, (evento_id, limit))
+                return cur.fetchall()
+        except Exception as e:
+            if "relation \"chat_eventos\" does not exist" in str(e):
+                if Evento._crear_tabla_chat():
+                    return Evento.get_mensajes_chat(evento_id, limit)
+            return []

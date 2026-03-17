@@ -52,6 +52,16 @@ def show():
         consulta_tendencia()
     elif tipo_consulta == 'Consulta personalizada SQL':
         consulta_sql_personalizada()
+    
+    # Mostrar resultados persistentes si existen
+    if 'last_query_results' in st.session_state and st.session_state.get('last_query_type') == tipo_consulta:
+        st.markdown("---")
+        df = st.session_state.last_query_results
+        nombre_base = st.session_state.last_query_filename
+        
+        st.success(f"Se encontraron {len(df)} resultados")
+        st.dataframe(df, use_container_width=True, hide_index=True)
+        exportar_resultados(df, nombre_base)
 
 def consulta_egresados_avanzada():
     """Consulta avanzada de egresados con múltiples filtros."""
@@ -84,11 +94,16 @@ def consulta_egresados_avanzada():
         submitted = st.form_submit_button("Buscar Egresados", type="primary", use_container_width=True)
     
     if submitted:
-        ejecutar_consulta_egresados(
+        df = ejecutar_consulta_egresados(
             carrera, facultad, año_desde, año_hasta,
             tiene_cv, perfil_publico, tiene_experiencia,
             años_exp if tiene_experiencia else None, cargo if tiene_experiencia else None
         )
+        if df is not None:
+            st.session_state.last_query_results = df
+            st.session_state.last_query_type = 'Egresados por filtros'
+            st.session_state.last_query_filename = "egresados_consulta"
+            st.rerun()
 
 def ejecutar_consulta_egresados(carrera, facultad, año_desde, año_hasta,
                                tiene_cv, perfil_publico, tiene_experiencia,
@@ -155,7 +170,7 @@ def ejecutar_consulta_egresados(carrera, facultad, año_desde, año_hasta,
         
         if not resultados:
             st.info("No se encontraron egresados con los filtros especificados")
-            return
+            return None
         
         df = pd.DataFrame(
             resultados,
@@ -163,13 +178,7 @@ def ejecutar_consulta_egresados(carrera, facultad, año_desde, año_hasta,
                     'Carrera', 'Facultad', 'Año Egreso', 'Tiene CV',
                     'Perfil Público', 'Experiencias']
         )
-        
-        st.success(f"Se encontraron {len(resultados)} egresados")
-        st.dataframe(df, use_container_width=True, hide_index=True)
-        
-        # Botón de exportación
-        if st.button("📥 Exportar Resultados"):
-            exportar_resultados(df, "egresados_consulta")
+        return df
 
 def consulta_empresas_avanzada():
     """Consulta avanzada de empresas."""
@@ -202,10 +211,15 @@ def consulta_empresas_avanzada():
         submitted = st.form_submit_button("Buscar Empresas", type="primary", use_container_width=True)
     
     if submitted:
-        ejecutar_consulta_empresas(
+        df = ejecutar_consulta_empresas(
             sector, tamano, ubicacion, estado,
             tiene_ofertas, ofertas_activas
         )
+        if df is not None:
+            st.session_state.last_query_results = df
+            st.session_state.last_query_type = 'Empresas por sector y ubicación'
+            st.session_state.last_query_filename = "empresas_consulta"
+            st.rerun()
 
 def ejecutar_consulta_empresas(sector, tamano, ubicacion, estado,
                               tiene_ofertas, ofertas_activas):
@@ -259,7 +273,7 @@ def ejecutar_consulta_empresas(sector, tamano, ubicacion, estado,
         
         if not resultados:
             st.info("No se encontraron empresas con los filtros especificados")
-            return
+            return None
         
         df = pd.DataFrame(
             resultados,
@@ -267,12 +281,7 @@ def ejecutar_consulta_empresas(sector, tamano, ubicacion, estado,
                     'Dirección', 'Email', 'Teléfono', 'Estado',
                     'Total Ofertas', 'Ofertas Activas']
         )
-        
-        st.success(f"Se encontraron {len(resultados)} empresas")
-        st.dataframe(df, use_container_width=True, hide_index=True)
-        
-        if st.button("📥 Exportar Resultados", key="exp_emp"):
-            exportar_resultados(df, "empresas_consulta")
+        return df
 
 def consulta_ofertas_avanzada():
     """Consulta avanzada de ofertas."""
@@ -304,10 +313,15 @@ def consulta_ofertas_avanzada():
         submitted = st.form_submit_button("Buscar Ofertas", type="primary", use_container_width=True)
     
     if submitted:
-        ejecutar_consulta_ofertas(
+        df = ejecutar_consulta_ofertas(
             tipo, modalidad, salario_min, salario_max,
             sector, ubicacion, solo_activas
         )
+        if df is not None:
+            st.session_state.last_query_results = df
+            st.session_state.last_query_type = 'Ofertas por rango salarial'
+            st.session_state.last_query_filename = "ofertas_consulta"
+            st.rerun()
 
 def ejecutar_consulta_ofertas(tipo, modalidad, salario_min, salario_max,
                             sector, ubicacion, solo_activas):
@@ -360,7 +374,13 @@ def ejecutar_consulta_ofertas(tipo, modalidad, salario_min, salario_max,
     if solo_activas:
         query += " AND o.activa = true"
     
-    query += " GROUP BY o.id, e.razon_social ORDER BY o.fecha_publicacion DESC"
+    query += """ 
+        GROUP BY 
+            o.titulo, e.razon_social, o.tipo, o.modalidad, o.ubicacion, 
+            o.salario_min, o.salario_max, o.fecha_publicacion, 
+            o.fecha_limite_postulacion, o.activa 
+        ORDER BY o.fecha_publicacion DESC
+    """
     
     with get_db_cursor() as cur:
         cur.execute(query, params)
@@ -368,7 +388,7 @@ def ejecutar_consulta_ofertas(tipo, modalidad, salario_min, salario_max,
         
         if not resultados:
             st.info("No se encontraron ofertas con los filtros especificados")
-            return
+            return None
         
         df = pd.DataFrame(
             resultados,
@@ -376,12 +396,7 @@ def ejecutar_consulta_ofertas(tipo, modalidad, salario_min, salario_max,
                     'Salario Mínimo', 'Salario Máximo', 'Publicación',
                     'Límite', 'Activa', 'Postulaciones']
         )
-        
-        st.success(f"Se encontraron {len(resultados)} ofertas")
-        st.dataframe(df, use_container_width=True, hide_index=True)
-        
-        if st.button("📥 Exportar Resultados", key="exp_of"):
-            exportar_resultados(df, "ofertas_consulta")
+        return df
 
 def consulta_postulaciones_avanzada():
     """Consulta avanzada de postulaciones."""
@@ -405,7 +420,12 @@ def consulta_postulaciones_avanzada():
         submitted = st.form_submit_button("Buscar Postulaciones", type="primary", use_container_width=True)
     
     if submitted:
-        ejecutar_consulta_postulaciones(fecha_desde, fecha_hasta, estado, empresa)
+        df = ejecutar_consulta_postulaciones(fecha_desde, fecha_hasta, estado, empresa)
+        if df is not None:
+            st.session_state.last_query_results = df
+            st.session_state.last_query_type = 'Postulaciones por período'
+            st.session_state.last_query_filename = "postulaciones_consulta"
+            st.rerun()
 
 def ejecutar_consulta_postulaciones(fecha_desde, fecha_hasta, estado, empresa):
     """Ejecuta la consulta de postulaciones."""
@@ -443,19 +463,14 @@ def ejecutar_consulta_postulaciones(fecha_desde, fecha_hasta, estado, empresa):
         
         if not resultados:
             st.info("No se encontraron postulaciones con los filtros especificados")
-            return
+            return None
         
         df = pd.DataFrame(
             resultados,
             columns=['Oferta', 'Empresa', 'Egresado', 'Estado',
                     'Fecha Postulación', 'Última Actualización', 'Días en Proceso']
         )
-        
-        st.success(f"Se encontraron {len(resultados)} postulaciones")
-        st.dataframe(df, use_container_width=True, hide_index=True)
-        
-        if st.button("📥 Exportar Resultados", key="exp_post"):
-            exportar_resultados(df, "postulaciones_consulta")
+        return df
 
 def consulta_compatibilidad():
     """Análisis de compatibilidad entre egresados y ofertas."""
@@ -629,24 +644,15 @@ def consulta_sql_personalizada():
     Solo use SELECT para consultas de lectura. No modifique datos.
     """)
     
-    sql_query = st.text_area(
-        "Ingrese su consulta SQL",
-        height=150,
-        placeholder="SELECT * FROM egresados LIMIT 10;"
-    )
+    with st.form("filtros_sql"):
+        sql_query = st.text_area(
+            "Ingrese su consulta SQL",
+            height=150,
+            placeholder="SELECT * FROM egresados LIMIT 10;"
+        )
+        submitted = st.form_submit_button("▶️ Ejecutar Consulta", type="primary", use_container_width=True)
     
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        ejecutar = st.button("▶️ Ejecutar Consulta", type="primary", use_container_width=True)
-    
-    with col2:
-        limpiar = st.button("🗑️ Limpiar", use_container_width=True)
-    
-    if limpiar:
-        st.rerun()
-    
-    if ejecutar and sql_query:
+    if submitted and sql_query:
         if sql_query.strip().upper().startswith('SELECT'):
             try:
                 with get_db_cursor() as cur:
@@ -658,12 +664,10 @@ def consulta_sql_personalizada():
                     
                     if resultados:
                         df = pd.DataFrame(resultados, columns=columnas)
-                        
-                        st.success(f"Consulta ejecutada exitosamente. {len(resultados)} filas obtenidas.")
-                        st.dataframe(df, use_container_width=True, hide_index=True)
-                        
-                        if st.button("📥 Exportar Resultados", key="exp_sql"):
-                            exportar_resultados(df, "consulta_sql")
+                        st.session_state.last_query_results = df
+                        st.session_state.last_query_type = 'Consulta personalizada SQL'
+                        st.session_state.last_query_filename = "consulta_sql"
+                        st.rerun()
                     else:
                         st.info("La consulta no devolvió resultados")
                         

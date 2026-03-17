@@ -9,6 +9,7 @@ from src.utils.database import get_db_cursor
 from src.utils.decorators import role_required
 from src.models.evento import Evento
 from src.utils.notifications import NotificationSystem
+from src.utils.pdf_generator import generar_pdf_reporte_generico
 
 @role_required(['administrador', 'empleador'])
 def show():
@@ -42,6 +43,31 @@ def mostrar_eventos():
         st.info("No hay eventos registrados.")
         return
 
+    # Botón para descargar reporte de eventos
+    col_rep1, col_rep2 = st.columns([3, 1])
+    with col_rep2:
+        # Preparar datos para el PDF
+        eventos_data = []
+        for ev in eventos:
+            eventos_data.append({
+                'Título': ev.titulo,
+                'Tipo': ev.tipo,
+                'Fecha Inicio': ev.fecha_inicio.strftime('%d/%m/%Y %H:%M'),
+                'Lugar': ev.lugar,
+                'Capacidad': ev.capacidad_maxima,
+                'Precio': f"S/. {ev.precio:.2f}" if not ev.es_gratuito else "Gratis"
+            })
+        
+        pdf_bytes = generar_pdf_reporte_generico(eventos_data, "Reporte de Eventos Registrados")
+        st.download_button(
+            label="📄 Descargar Reporte PDF",
+            data=pdf_bytes,
+            file_name=f"reporte_eventos_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+            mime="application/pdf",
+            key="download_eventos_pdf",
+            use_container_width=True
+        )
+
     for ev in eventos:
         with st.container(border=True):
             col1, col2, col3 = st.columns([3, 1, 1])
@@ -67,12 +93,35 @@ def mostrar_eventos():
             if 'ver_inscritos' in st.session_state and st.session_state.ver_inscritos == ev.id:
                 with st.expander("Lista de Inscritos", expanded=True):
                     if inscritos:
-                        df_insc = pd.DataFrame(inscritos, columns=['ID', 'Email', 'Fecha Insc.', 'Asistencia'])
+                        # Convertimos los datos para mostrar en DataFrame
+                        df_insc = pd.DataFrame(inscritos, columns=['ID_Usuario', 'Email', 'Fecha Insc.', 'Asistencia'])
                         st.dataframe(df_insc, use_container_width=True)
                         
-                        if st.button("Cerrar Lista"):
-                            del st.session_state.ver_inscritos
-                            st.rerun()
+                        # Generar reporte PDF de inscritos
+                        inscritos_data = []
+                        for row in inscritos:
+                            inscritos_data.append({
+                                'Email': row[1],
+                                'Fecha': row[2].strftime('%d/%m/%Y %H:%M') if hasattr(row[2], 'strftime') else str(row[2]),
+                                'Asistencia': 'SÍ' if row[3] else 'NO'
+                            })
+                        
+                        pdf_insc = generar_pdf_reporte_generico(inscritos_data, f"Inscritos - {ev.titulo}")
+                        
+                        col_btn1, col_btn2 = st.columns(2)
+                        with col_btn1:
+                            st.download_button(
+                                "📄 Descargar Lista (PDF)",
+                                data=pdf_insc,
+                                file_name=f"Inscritos_{ev.titulo}_{datetime.now().strftime('%Y%m%d')}.pdf",
+                                mime="application/pdf",
+                                key=f"btn_pdf_insc_{ev.id}",
+                                use_container_width=True
+                            )
+                        with col_btn2:
+                            if st.button("Cerrar Lista", key=f"close_{ev.id}", use_container_width=True):
+                                del st.session_state.ver_inscritos
+                                st.rerun()
                     else:
                         st.info("No hay inscritos aún.")
 

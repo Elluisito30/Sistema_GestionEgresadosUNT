@@ -119,7 +119,7 @@ def reportes_egresados():
             if egresados_anio:
                 st.subheader("Egresados por Año")
                 df_anio = pd.DataFrame(egresados_anio, columns=['Año', 'Cantidad'])
-                fig = px.line(df_anio, x='Año', y='Cantidad', title='Tendencia de Egresados')
+                fig = px.line(df_anio, x='Año', y='Cantidad', title='Tendencia de Egresados', markers=True)
                 st.plotly_chart(fig, use_container_width=True)
         
         # Tabla detallada
@@ -658,7 +658,7 @@ def reportes_financieros():
                     ingresos_diarios,
                     columns=['Fecha', 'Monto']
                 )
-                fig = px.line(df_diario, x='Fecha', y='Monto', title='Evolución Diaria')
+                fig = px.line(df_diario, x='Fecha', y='Monto', title='Evolución Diaria', markers=True)
                 st.plotly_chart(fig, use_container_width=True)
         
         # Tabla detallada de conceptos
@@ -812,6 +812,15 @@ def generar_exportacion(tipo, formato, fecha_desde, fecha_hasta):
             
             # Exportar según formato
             if formato == 'Excel':
+                # Quitar zonas horarias de columnas datetime para compatibilidad con openpyxl/Excel
+                for col in df.columns:
+                    if pd.api.types.is_datetime64_any_dtype(df[col]):
+                        try:
+                            df[col] = df[col].dt.tz_localize(None)
+                        except Exception:
+                            # Si ya es naive o falla, intentamos convertir a string o simplemente ignorar
+                            pass
+                
                 output = io.BytesIO()
                 with pd.ExcelWriter(output, engine='openpyxl') as writer:
                     df.to_excel(writer, index=False, sheet_name=tipo)

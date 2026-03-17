@@ -106,10 +106,25 @@ def render_admin_dashboard(user):
         st.subheader("📈 Egresados Registrados por Mes")
         df_egresados_mes = get_egresados_por_mes()
         if df_egresados_mes is not None and not df_egresados_mes.empty:
-            fig = px.line(df_egresados_mes, x='mes', y='total_egresados', title='Tendencia de Registros')
+            # Asegurar que el mes sea legible y sin zona horaria para Plotly
+            df_egresados_mes['mes'] = pd.to_datetime(df_egresados_mes['mes']).dt.tz_localize(None)
+            
+            # Usar un gráfico de barras que es más visible con pocos puntos de datos
+            fig = px.bar(
+                df_egresados_mes, 
+                x='mes', 
+                y='total_egresados', 
+                title='Tendencia de Registros',
+                labels={'mes': 'Mes', 'total_egresados': 'Cantidad'},
+                color_discrete_sequence=['#0056b3']
+            )
+            
+            # Ajustar el formato del eje X para mostrar el nombre del mes
+            fig.update_xaxes(dtick="M1", tickformat="%b %Y")
+            
             st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.error("No se pudo conectar a la base de datos para recuperar las métricas.")
+        else:
+            st.info("Aún no hay suficientes datos históricos para mostrar el gráfico de registros.")
 
 def render_egresado_dashboard(user):
     st.title("Mi Dashboard")
@@ -197,108 +212,20 @@ def render_empleador_dashboard(user):
     except Exception:
         st.error("Error al cargar los datos del empleador.")
 
-def load_page(page_name):
-    """Carga dinámicamente el módulo desde src.pages."""
-    module_name = f"src.pages.{page_name}"
-    try:
-        module = importlib.import_module(module_name)
-        if hasattr(module, 'show'):
-            module.show()
-        else:
-            st.warning(f"La página '{page_name}' no provee una función 'show()'.")
-    except ModuleNotFoundError as e:
-        if getattr(e, "name", None) == module_name:
-            st.info(f"Página en construcción: {page_name}")
-        else:
-            st.error(
-                f"No se pudo cargar la página '{page_name}' por una dependencia faltante: {getattr(e, 'name', 'desconocida')}. "
-                "Ejecuta 'pip install -r requirements.txt'."
-            )
-    except Exception as e:
-        st.error(f"Error al cargar la página '{page_name}': {str(e)}")
-
 def show():
     user = st.session_state.user
     rol = user['rol']
 
-    with st.sidebar:
-        # Logo de la universidad
-        st.image("https://upload.wikimedia.org/wikipedia/commons/6/6e/Universidad_Nacional_de_Trujillo_-_Per%C3%BA_vector_logo.png", use_container_width=True)
-        
-        # Título decorativo
-        st.markdown("<h2 style='text-align: center; color: #0056b3;'>🎓 Gestión UNT</h2>", unsafe_allow_html=True)
-        st.markdown("---")
-
-        # Información del usuario con estilo
-        st.markdown(f"""
-            <div style='background-color: #f0f2f6; padding: 10px; border-radius: 5px; margin-bottom: 10px;'>
-                <p style='margin: 0; font-size: 0.9rem; color: #555;'>Usuario:</p>
-                <p style='margin: 0; font-weight: bold;'>👤 {user['email']}</p>
-                <p style='margin: 0; font-size: 0.9rem; color: #555; margin-top: 5px;'>Rol:</p>
-                <p style='margin: 0; font-weight: bold;'>🛡️ {rol.capitalize()}</p>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown("---")
-        st.markdown("### 🧭 Navegación")
-
-        if rol == 'administrador':
-            menu_options = {
-                "🏠 Dashboard Principal": "dashboard",
-                "👥 Egresados": "egresados_lista",
-                "🏢 Empresas": "empresas_lista",
-                "💼 Ofertas": "ofertas_admin",
-                "📅 Eventos": "eventos_gestionar",
-                "💰 Pagos": "pagos_admin",
-                "📊 Reportes": "reportes_dashboard",
-                "📝 Encuestas": "encuestas_disenar",
-                "🔍 Consultas Avanzadas": "consultas_avanzadas",
-                "📋 Bitácora": "auditoria_bitacora",
-                "🔔 Notificaciones": "notificaciones_centro",
-                "👤 Mi Perfil": "perfil_mi_cuenta"
-            }
-        elif rol == 'egresado':
-            menu_options = {
-                "🏠 Mi Dashboard": "dashboard",
-                "👤 Mi Perfil": "egresados_mi_perfil",
-                "💼 Buscar Ofertas": "ofertas_buscar",
-                "📋 Mis Postulaciones": "postulaciones_seguimiento",
-                "📅 Eventos": "eventos_calendario",
-                "📄 Mis Pagos": "pagos_mis_vouchers",
-                "📝 Encuestas Pendientes": "encuestas_responder",
-                "🔔 Notificaciones": "notificaciones_centro"
-            }
-        elif rol == 'empleador':
-            menu_options = {
-                "🏠 Dashboard Empresa": "dashboard",
-                "🏢 Mi Empresa": "empresa_perfil",
-                "📢 Gestionar Ofertas": "ofertas_gestionar",
-                "👥 Revisar Postulaciones": "postulaciones_revisar",
-                "📅 Mis Eventos": "eventos_gestionar",
-                "🔔 Notificaciones": "notificaciones_centro",
-                "👤 Mi Perfil": "perfil_mi_cuenta"
-            }
-        else:
-            menu_options = {"🏠 Dashboard": "dashboard"}
-
-        selected_label = st.radio("Navegación", options=list(menu_options.keys()), index=0)
-        selected_page = menu_options[selected_label]
-
-        st.markdown("---")
-        if st.button("🚪 Cerrar Sesión"):
-            logout_usuario()
-
-    # Enrutamiento Principal
-    if selected_page == "dashboard":
-        if rol == 'administrador':
-            render_admin_dashboard(user)
-        elif rol == 'egresado':
-            render_egresado_dashboard(user)
-        elif rol == 'empleador':
-            render_empleador_dashboard(user)
+    # El menú lateral ahora se maneja en app.py para ser persistente
+    
+    if rol == 'administrador':
+        render_admin_dashboard(user)
+    elif rol == 'egresado':
+        render_egresado_dashboard(user)
+    elif rol == 'empleador':
+        render_empleador_dashboard(user)
     else:
-        # Cargar otra página usando importlib
-        load_page(selected_page)
+        st.error("Rol de usuario no reconocido.")
 
     st.markdown("---")
     st.caption("Universidad Nacional de Trujillo - Sistema de Gestión de Egresados v1.0")

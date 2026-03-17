@@ -277,22 +277,39 @@ def show():
             # Formulario de edición (Solo para empleador o admin)
             with st.form("edit_empresa_form"):
                 st.write("Actualizar información de la empresa")
-                new_nombre = st.text_input("Nombre Comercial", value=empresa.nombre_comercial or "")
-                new_direccion = st.text_input("Dirección", value=empresa.direccion or "")
-                new_web = st.text_input("Sitio Web", value=empresa.sitio_web or "")
-                new_email = st.text_input("Email de Contacto", value=empresa.email_contacto or "")
                 
-                submitted = st.form_submit_button("💾 Guardar Cambios")
+                col1, col2 = st.columns(2)
+                with col1:
+                    new_nombre = st.text_input("Nombre Comercial", value=empresa.nombre_comercial or "")
+                    new_sector = st.text_input("Sector Económico", value=empresa.sector_economico or "")
+                    new_tamano = st.selectbox(
+                        "Tamaño", 
+                        options=["micro", "pequeña", "mediana", "grande"],
+                        index=["micro", "pequeña", "mediana", "grande"].index(empresa.tamano_empresa) if empresa.tamano_empresa in ["micro", "pequeña", "mediana", "grande"] else 0
+                    )
+                    new_direccion = st.text_input("Dirección", value=empresa.direccion or "")
+                
+                with col2:
+                    new_web = st.text_input("Sitio Web", value=empresa.sitio_web or "")
+                    new_email = st.text_input("Email de Contacto", value=empresa.email_contacto or "")
+                    new_tel = st.text_input("Teléfono de Contacto", value=empresa.telefono_contacto or "")
+                    new_logo = st.text_input("URL del Logo", value=empresa.logo_url or "")
+                
+                submitted = st.form_submit_button("💾 Guardar Cambios", use_container_width=True)
                 
                 if submitted:
                     empresa.nombre_comercial = new_nombre
+                    empresa.sector_economico = new_sector
+                    empresa.tamano_empresa = new_tamano
                     empresa.direccion = new_direccion
                     empresa.sitio_web = new_web
                     empresa.email_contacto = new_email
+                    empresa.telefono_contacto = new_tel
+                    empresa.logo_url = new_logo
                     
                     exito, msg = empresa.save()
                     if exito:
-                        add_notification(msg, "success")
+                        add_notification("Información de empresa actualizada con éxito.", "success")
                         st.rerun()
                     else:
                         st.error(msg)

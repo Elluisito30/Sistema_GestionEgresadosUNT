@@ -45,7 +45,7 @@ def show():
     user = st.session_state.user
     rol = user["rol"]
 
-    st.title("📢 Gestion de Ofertas Laborales")
+    st.title("📢 Gestión de Ofertas Laborales")
     render_notifications()
 
     if rol not in ["administrador", "empleador"]:
@@ -53,7 +53,7 @@ def show():
         return
 
     if rol == "administrador":
-        tab1, tab2 = st.tabs(["🔎 Gestion y Analisis", "➕ Nueva Oferta (Admin)"])
+        tab1, tab2 = st.tabs(["🔎 Gestión y Analisis", "➕ Nueva Oferta (Admin)"])
     else:
         tab1, tab2 = st.tabs(["📋 Mis Ofertas", "➕ Publicar Nueva Oferta"])
 
@@ -150,7 +150,11 @@ def _buscar_ofertas(rol, user_id, termino=None, estado=None, tipo=None, modalida
         params.append(modalidad)
 
     query += """
-        GROUP BY o.id, e.razon_social, e.ruc, e.sitio_web
+        GROUP BY 
+            o.id, o.empresa_id, o.titulo, o.descripcion, o.requisitos, o.tipo, 
+            o.modalidad, o.ubicacion, o.salario_min, o.salario_max, 
+            o.fecha_publicacion, o.fecha_limite_postulacion, o.activa, 
+            o.carrera_objetivo, e.razon_social, e.ruc, e.sitio_web
         ORDER BY o.fecha_publicacion DESC
     """
 
