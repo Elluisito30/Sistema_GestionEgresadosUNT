@@ -10,13 +10,14 @@ Este proyecto es un sistema integral para conectar a la Universidad Nacional de 
 - **Base de Datos:** [PostgreSQL](https://www.postgresql.org/)
 - **Contenedorización:** [Docker](https://www.docker.com/) y Docker Compose
 - **Lenguaje:** Python 3.10+
+- **Librerías Clave:** Pandas, Plotly, OpenPyXL, Bcrypt, Psycopg2
  
 ---
  
 ## Requisitos Previos
  
-- Tener instalado [Docker](https://docs.docker.com/get-docker/) y [Docker Compose](https://docs.docker.com/compose/install/) (incluido en Docker Desktop).
-- (Opcional) Git para clonar el repositorio.
+- Tener instalado [Docker Desktop](https://docs.docker.com/get-docker/) (incluye Docker Compose).
+- Navegador web moderno (Chrome, Edge, Firefox).
  
 ---
  
@@ -24,126 +25,104 @@ Este proyecto es un sistema integral para conectar a la Universidad Nacional de 
  
 Sigue estos pasos para levantar el entorno completo:
  
-### 1. Clona el repositorio (o descarga los archivos)
+### 1. Preparar el entorno
  
-```bash
-git clone <url-del-repositorio>
-cd egresados_unt_app
-```
-
-### 2. Crea tu archivo de variables de entorno
-
-Usa el archivo [.env.example](.env.example) como base:
-
-```bash
-copy .env.example .env
-```
-
-En PowerShell también puedes usar:
-
+Clona el repositorio y crea tu archivo de configuración:
+ 
 ```powershell
+# Clonar repositorio (o descargar archivos)
+cd Sistema_GestionEgresadosUNT
+
+# Crear archivo .env desde el ejemplo
 Copy-Item .env.example .env
 ```
  
-### 3. Inicia los servicios con Docker Compose
+### 2. Iniciar los servicios con Docker Compose
  
-```bash
-docker-compose up -d
+```powershell
+docker-compose up -d --build
 ```
  
-> Este comando descargará las imágenes necesarias (PostgreSQL, pgAdmin) y construirá la imagen de la aplicación Streamlit. La primera vez puede tomar varios minutos.
->
-> En una base de datos nueva, Docker ejecuta automáticamente [database/create_bd.sql](database/create_bd.sql) y [database/seed_bd.sql](database/seed_bd.sql), por lo que el esquema y los usuarios de prueba quedan listos al primer arranque.
+> **Nota:** El flag `--build` asegura que se apliquen los últimos cambios realizados en el código Python. 
+> 
+> En el primer arranque, Docker ejecutará automáticamente los scripts en orden:
+> 1. `database/create_bd.sql`: Crea las tablas, tipos ENUM e índices.
+> 2. `database/seed_bd.sql`: Carga todos los datos de prueba (usuarios, egresados, empresas, ofertas).
 
-### 4. Si ya tenías un volumen creado y quieres reinicializar la base
+### 3. Si necesitas reiniciar la base de datos (Limpieza Total)
 
-Los scripts de inicialización de PostgreSQL solo se ejecutan la primera vez que se crea el volumen. Si ya levantaste el proyecto antes y quieres regenerar la base con datos de prueba:
+Si has modificado la estructura de las tablas o quieres limpiar todos los datos para volver al estado inicial:
 
-```bash
+```powershell
 docker-compose down -v
-docker-compose up -d
+docker-compose up -d --build
 ```
- 
-### 5. Accede a la aplicación
- 
-| Servicio | URL |
-|---|---|
-| Aplicación Web | http://localhost:8501 |
-| pgAdmin (Gestor BD) | http://localhost:5050 |
- 
-**Credenciales de pgAdmin:**
-- Email: `admin@admin.com`
-- Contraseña: `postgres`
- 
-**Para conectar al servidor de BD desde pgAdmin:**
- 
-| Campo | Valor |
-|---|---|
-| Host | `db` |
-| Port | `5432` |
-| Database | `egresados_unt_db` |
-| User | `postgres` |
-| Password | `postgres` |
+*El parámetro `-v` es fundamental ya que elimina el volumen persistente de la base de datos.*
+
+### 4. Actualizar solo los datos (Seed Manual)
+
+Si el contenedor ya está corriendo y solo quieres refrescar los datos de prueba sin borrar las tablas:
+
+```powershell
+Get-Content database/seed_bd.sql | docker exec -i bd_egresadosUNT psql -U postgres -d bd_egresadosUNT
+```
  
 ---
+
+## Credenciales de Prueba (Actualizadas)
  
-## Credenciales de Prueba (Base de Datos Inicial)
+El sistema cuenta con un esquema de contraseñas unificado para las cuentas de prueba: `<primer_nombre>123` (todo en minúsculas).
  
-Después del primer arranque con Docker en una base nueva, se cargan automáticamente datos de prueba desde [database/seed_bd.sql](database/seed_bd.sql). Puedes usar los siguientes usuarios:
- 
-| Rol | Usuario | Contraseña |
+| Rol | Usuario (Email) | Contraseña |
 |---|---|---|
-| Administrador | `admin@unitru.edu.pe` | `admin123` |
-| Egresado | `juan.perez@unitru.edu.pe` | `juan123` |
-| Empleador | `rrhh@techandina.com` | `empleador123` |
+| **Administrador** | `admin@unitru.edu.pe` | `admin123` |
+| **Egresado 1** | `juan.perez@unitru.edu.pe` | `juan123` |
+| **Egresado 2** | `ana.garcia@unitru.edu.pe` | `ana123` |
+| **Egresado 3** | `luis.rojas@unitru.edu.pe` | `luis123` |
+| **Egresado 4** | `maria.lopez@unitru.edu.pe` | `maria123` |
+| **Egresado 5** | `pedro.sanchez@unitru.edu.pe` | `pedro123` |
+| **Empleador 1** | `rrhh@techandina.com` | `empleador123` |
+| **Empleador 2** | `contacto@minerals.pe` | `elena123` |
  
-> **Nota:** La empresa empleadora debe estar activa en el sistema. En un entorno real, las contraseñas deben ser mucho más seguras.
+---
+
+## Módulos Principales Implementados
+ 
+- **Navegación Dinámica**: Menú lateral persistente que carga módulos bajo demanda según el rol del usuario.
+- **Gestión de Egresados (Admin)**: 
+    - **Visualización**: Listado de solo lectura con métricas en tiempo real.
+    - **Registro**: Formulario para dar de alta nuevos alumnos.
+    - **Edición**: Formulario tradicional con validaciones y botones de guardar/cancelar.
+- **Consultas Avanzadas**: Buscador multivariante con persistencia de resultados y exportación a **Excel** y **PDF** (corregido para zonas horarias).
+- **Dashboard Estadístico**: Gráficos interactivos de tendencia de registros y métricas de impacto.
  
 ---
  
 ## Estructura del Proyecto
  
 ```
-egresados_unt_app/
-├── app.py                  # Punto de entrada de la aplicación
-├── src/                    # Lógica de la aplicación (autenticación, páginas, utilidades)
+Sistema_GestionEgresadosUNT/
+├── app.py                  # Punto de entrada y Enrutador Dinámico
+├── src/                    # Lógica central
+│   ├── pages/              # Módulos de la aplicación (Egresados, Empresas, etc.)
+│   ├── utils/              # Generadores de Excel/PDF, Gestión de Sesión y BD
+│   ├── models/             # Modelos de datos (Egresado, Empresa, etc.)
+│   └── auth.py             # Lógica de autenticación y hashing
 ├── database/
-│   ├── create_bd.sql       # Script SQL para crear el esquema de la base de datos
-│   └── seed_bd.sql         # Datos de prueba para desarrollo
-├── docker-compose.yml      # Orquestación de servicios (app, db, pgadmin)
-├── .env.example            # Plantilla de variables de entorno
-└── Dockerfile              # Definición de la imagen de la aplicación
+│   ├── create_bd.sql       # Esquema de base de datos (Tablas/Vistas)
+│   └── seed_bd.sql         # Datos de prueba (Seed completo)
+├── docker-compose.yml      # Orquestación (App + PostgreSQL + pgAdmin)
+└── Dockerfile              # Configuración del entorno Python
 ```
  
 ---
  
-## Detener el Sistema
+## Soporte y Mantenimiento
  
-Para detener y eliminar los contenedores:
- 
+Para ver los registros de errores en tiempo real:
 ```bash
-docker-compose down
+docker logs -f Sistema_GestionEgresadosUNT
 ```
- 
-Para también eliminar los volúmenes de la base de datos (**¡esto borrará todos los datos!**):
- 
-```bash
-docker-compose down -v
-```
- 
----
- 
-## Advertencias y Buenas Prácticas
- 
-1. **Seguridad de Contraseñas:** Las contraseñas usadas en el `docker-compose.yml` son débiles (`postgres`, `admin`). Esto es **inaceptable en producción**. Usa variables de entorno o un sistema de secretos (Docker Swarm secrets, HashiCorp Vault, etc.) para gestionar credenciales.
- 
-2. **Validación de Entradas:** Es crucial implementar una validación robusta en **todos** los formularios para prevenir inyección SQL y XSS. Psycopg2, usado correctamente con `%s`, ya protege contra inyección SQL, pero se deben validar los tipos de datos.
- 
-3. **Manejo de Sesiones:** `st.session_state` es seguro dentro de una sesión de usuario, pero no es un sustituto de una gestión de sesiones backend robusta si la aplicación escalara a múltiples réplicas.
- 
-4. **Rendimiento:** El dashboard del administrador puede ralentizarse si la base de datos crece. Las vistas materializadas y el decorador `st.cache_data` son aliados clave para mejorar el rendimiento de consultas pesadas.
- 
-5. **Manejo de Errores:** Cada llamada a la base de datos debe estar envuelta en bloques `try...except` para mostrar mensajes amigables al usuario y registrar errores técnicos en un archivo de log.
- 
-6. **Código QR en Vouchers:** La generación de QR debe incluir un identificador único y una URL de validación (ej. `https://tudominio.com/validar?code=UUID`) para verificar autenticidad sin necesidad de buscar por texto completo.
- 
+
+Para acceder a la base de datos visualmente (pgAdmin): [http://localhost:5050](http://localhost:5050)
+- Usuario: `admin@admin.com` | Clave: `postgres`
