@@ -314,6 +314,95 @@ def _dibujar_tabla_paginada(cv, width, height, data, col_widths, col_colors,
     _flush(page_rows, y_top, is_last=True)
 
 
+def generar_pdf_voucher_simple(voucher_data, qr_bytes=None):
+    """Genera un PDF de voucher de pago con diseño estándar y simple."""
+    buffer = io.BytesIO()
+    cv = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+    
+    # Logo simple arriba a la izquierda
+    try:
+        logo = ImageReader(UNT_LOGO_URL)
+        cv.drawImage(logo, 1.5*cm, height - 3*cm, width=2.5*cm, height=2.5*cm, mask="auto")
+    except:
+        pass
+
+    # Texto institucional simple
+    cv.setFont("Helvetica-Bold", 14)
+    cv.drawString(4.5*cm, height - 1.8*cm, "UNIVERSIDAD NACIONAL DE TRUJILLO")
+    cv.setFont("Helvetica", 10)
+    cv.drawString(4.5*cm, height - 2.3*cm, "Dirección de Seguimiento del Egresado y Empleabilidad")
+    
+    # Línea divisoria
+    cv.setStrokeColor(colors.black)
+    cv.setLineWidth(1)
+    cv.line(1.5*cm, height - 3.5*cm, width - 1.5*cm, height - 3.5*cm)
+
+    # Título central
+    cv.setFont("Helvetica-Bold", 16)
+    cv.drawCentredString(width/2, height - 4.5*cm, "COMPROBANTE DE PAGO")
+    
+    # Cuadro de datos
+    y = height - 6*cm
+    cv.setFont("Helvetica-Bold", 11)
+    cv.drawString(2*cm, y, "CÓDIGO DE VOUCHER:")
+    cv.setFont("Helvetica", 11)
+    cv.drawString(7*cm, y, str(voucher_data.get('codigo_voucher', '—')))
+    
+    y -= 1*cm
+    cv.setFont("Helvetica-Bold", 11)
+    cv.drawString(2*cm, y, "FECHA DE EMISIÓN:")
+    cv.setFont("Helvetica", 11)
+    fecha_pago = voucher_data.get("fecha_pago")
+    fecha_str = fecha_pago.strftime("%d/%m/%Y %H:%M") if hasattr(fecha_pago, "strftime") else str(fecha_pago or "—")
+    cv.drawString(7*cm, y, fecha_str)
+
+    y -= 1*cm
+    cv.setFont("Helvetica-Bold", 11)
+    cv.drawString(2*cm, y, "EGRESADO:")
+    cv.setFont("Helvetica", 11)
+    cv.drawString(7*cm, y, str(voucher_data.get('nombre', '—')))
+
+    y -= 1*cm
+    cv.setFont("Helvetica-Bold", 11)
+    cv.drawString(2*cm, y, "CONCEPTO:")
+    cv.setFont("Helvetica", 11)
+    cv.drawString(7*cm, y, str(voucher_data.get('concepto', '—')).upper())
+
+    y -= 1*cm
+    cv.setFont("Helvetica-Bold", 11)
+    cv.drawString(2*cm, y, "MONTO TOTAL:")
+    cv.setFont("Helvetica-Bold", 13)
+    cv.drawString(7*cm, y, f"S/. {float(voucher_data.get('monto', 0) or 0):.2f}")
+
+    # Estado del pago
+    y -= 1.5*cm
+    estado = "PAGADO / VALIDADO" if voucher_data.get("validado") else "PENDIENTE DE VALIDACIÓN"
+    cv.setFont("Helvetica-Bold", 12)
+    cv.setFillColor(colors.green if voucher_data.get("validado") else colors.red)
+    cv.drawCentredString(width/2, y, f"ESTADO: {estado}")
+    cv.setFillColor(colors.black)
+
+    # QR centrado abajo
+    if qr_bytes:
+        try:
+            qr_buffer = io.BytesIO(qr_bytes)
+            qr_image = ImageReader(qr_buffer)
+            cv.drawImage(qr_image, (width - 5*cm)/2, y - 6*cm, width=5*cm, height=5*cm, mask="auto")
+            cv.setFont("Helvetica-Oblique", 8)
+            cv.drawCentredString(width/2, y - 6.5*cm, "Escanee para verificar la autenticidad")
+        except:
+            pass
+
+    # Pie de página simple
+    cv.setFont("Helvetica", 8)
+    cv.drawCentredString(width/2, 2*cm, "Este es un comprobante generado por el Sistema de Egresados UNT.")
+    cv.drawCentredString(width/2, 1.5*cm, f"Fecha de impresión: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
+
+    cv.showPage()
+    cv.save()
+    return buffer.getvalue()
+
 def generar_pdf_voucher_pago(voucher_data, qr_bytes=None):
     """Genera un PDF de voucher de pago con diseño moderno."""
     buffer = io.BytesIO()

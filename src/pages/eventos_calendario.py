@@ -63,15 +63,26 @@ def show():
                         if ya_inscrito:
                             st.success("✅ Ya estás inscrito")
                         else:
-                            if st.button("📝 Inscribirme", key=f"btn_ins_{ev.id}", type="primary"):
-                                exito, mensaje = Evento.inscribir_usuario(ev.id, usuario_id)
-                                if exito:
-                                    st.success("¡Inscripción exitosa!")
-                                    NotificationSystem.create(usuario_id, "Inscripción a Evento", f"Te has inscrito a {ev.titulo}")
-                                    enviar_notificacion_evento(st.session_state.user['email'], ev.titulo, ev.fecha_inicio.strftime('%d/%m/%Y'))
+                            if ev.es_gratuito:
+                                # Confirmación para eventos gratuitos
+                                with st.popover("📝 Inscribirme", use_container_width=True):
+                                    st.write(f"¿Deseas inscribirte en el evento gratuito: **{ev.titulo}**?")
+                                    if st.button("Confirmar Inscripción", key=f"conf_ins_{ev.id}", type="primary", use_container_width=True):
+                                        exito, mensaje = Evento.inscribir_usuario(ev.id, usuario_id)
+                                        if exito:
+                                            st.success("¡Inscripción exitosa!")
+                                            NotificationSystem.create(usuario_id, "Inscripción a Evento", f"Te has inscrito a {ev.titulo}")
+                                            enviar_notificacion_evento(st.session_state.user['email'], ev.titulo, ev.fecha_inicio.strftime('%d/%m/%Y'))
+                                            st.rerun()
+                                        else:
+                                            st.error(mensaje)
+                            else:
+                                # Redirección para eventos de pago
+                                if st.button("💳 Pagar e Inscribirme", key=f"btn_pay_{ev.id}", type="primary", use_container_width=True):
+                                    st.session_state.current_page = "pagos_mis_vouchers"
+                                    st.session_state.pago_referencia_id = ev.id
+                                    st.session_state.pago_concepto = "evento"
                                     st.rerun()
-                                else:
-                                    st.error(mensaje)
 
     # --- PESTAÑA 2: MIS CONSTANCIAS ---
     with tab_constancias:

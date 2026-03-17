@@ -80,41 +80,29 @@ def get_current_page():
     """
     return st.session_state.get('current_page', 'dashboard')
 
-def add_notification(message, type="info"):
-    """
-    Añade una notificación a la sesión del usuario.
-    
-    Args:
-        message (str): Mensaje de la notificación
-        type (str): Tipo de notificación (info, success, warning, error)
-    """
+def render_notifications():
+    """Muestra las notificaciones guardadas en la sesión."""
     if 'notifications' not in st.session_state:
         st.session_state.notifications = []
+        
+    for msg, type in st.session_state.notifications:
+        if type == 'success':
+            st.success(msg)
+        elif type == 'error':
+            st.error(msg)
+        elif type == 'warning':
+            st.warning(msg)
+        else:
+            st.info(msg)
     
-    st.session_state.notifications.append({
-        'message': message,
-        'type': type,
-        'timestamp': datetime.now()
-    })
-
-def clear_notifications():
-    """Limpia todas las notificaciones de la sesión."""
+    # Limpiar notificaciones después de mostrarlas
     st.session_state.notifications = []
 
-def render_notifications():
-    """Renderiza las notificaciones pendientes en la UI."""
-    if 'notifications' in st.session_state and st.session_state.notifications:
-        for notif in st.session_state.notifications:
-            if notif['type'] == 'success':
-                st.success(notif['message'])
-            elif notif['type'] == 'error':
-                st.error(notif['message'])
-            elif notif['type'] == 'warning':
-                st.warning(notif['message'])
-            else:
-                st.info(notif['message'])
-        # Limpiar notificaciones después de mostrarlas
-        clear_notifications()
+def add_notification(message, type='info'):
+    """Añade una notificación para ser mostrada en el próximo renderizado."""
+    if 'notifications' not in st.session_state:
+        st.session_state.notifications = []
+    st.session_state.notifications.append((message, type))
 
 def save_form_data(key, data):
     """

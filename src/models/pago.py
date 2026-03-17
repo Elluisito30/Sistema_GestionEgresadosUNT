@@ -80,7 +80,7 @@ class Pago:
                     p.pagado,
                     p.validado,
                     CASE
-                        WHEN p.concepto = 'evento' THEN COALESCE((SELECT titulo FROM eventos WHERE id = p.referencia_id::uuid), 'Evento')
+                        WHEN p.concepto = 'evento' THEN COALESCE((SELECT titulo FROM eventos WHERE id = p.referencia_id), 'Evento')
                         WHEN p.concepto = 'certificado' THEN 'Certificado'
                         WHEN p.concepto = 'membresia' THEN 'Membresía'
                     END as descripcion

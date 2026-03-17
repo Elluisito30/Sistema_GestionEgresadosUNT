@@ -79,13 +79,15 @@ INSERT INTO eventos (publicado_por, titulo, descripcion, tipo, fecha_inicio, fec
 (1, 'Feria Laboral de Ingeniería 2026', 'Conecta con las mejores empresas de la región.', 'feria_laboral', '2026-04-25 09:00', '2026-04-26 18:00', 'Ciudad Universitaria UNT', TRUE, 0),
 (1, 'Webinar: Tu CV en la era de la IA', 'Aprende a optimizar tu CV con inteligencia artificial.', 'webinar', '2026-03-28 19:00', '2026-03-28 21:00', 'Online - Zoom', TRUE, 0),
 (1, 'Curso: Finanzas para Emprendedores', 'Conceptos clave para iniciar tu propio negocio.', 'curso', '2026-05-05 18:00', '2026-05-26 20:00', 'Online - Plataforma UNT', FALSE, 150.00),
-(1, 'Charla: El Futuro de la Minería Sostenible', 'Expertos de Minerals Corp comparten su visión.', 'charla', '2026-04-08 16:00', '2026-04-08 18:00', 'Auditorio de Geología', TRUE, 0);
+(1, 'Charla: El Futuro de la Minería Sostenible', 'Expertos de Minerals Corp comparten su visión.', 'charla', '2026-04-08 16:00', '2026-04-08 18:00', 'Auditorio de Geología', TRUE, 0),
+(1, 'Workshop: Liderazgo y Trabajo en Equipo', 'Desarrolla habilidades blandas críticas para el éxito laboral.', 'curso', '2026-06-15 09:00', '2026-06-15 13:00', 'Centro de Idiomas UNT', FALSE, 80.00),
+(1, 'Seminario: Innovación Tecnológica 2025', 'Tendencias emergentes en IA y computación cuántica.', 'charla', '2025-10-15 09:00', '2025-10-15 18:00', 'Auditorio Copérnico - UNT', TRUE, 0);
 
 -- =====================================================
---  INSCRIPCIONES A EVENTOS (3)
+--  INSCRIPCIONES A EVENTOS (4)
 -- =====================================================
-INSERT INTO inscripciones_eventos (evento_id, usuario_id) VALUES
-(1, 2), (2, 2), (4, 2);
+INSERT INTO inscripciones_eventos (evento_id, usuario_id, asistio) VALUES
+(1, 2, FALSE), (2, 2, FALSE), (4, 2, FALSE), (6, 2, TRUE);
 
 -- =====================================================
 --  HISTORIAL LABORAL Y ACADÉMICO

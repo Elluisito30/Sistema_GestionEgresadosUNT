@@ -37,20 +37,32 @@ def mostrar_panel_validacion():
     """Permite revisar y validar vouchers por código."""
     st.subheader("Validación de vouchers")
 
+    # Inicializar estado de selección si no existe
+    if 'admin_selected_pago_id' not in st.session_state:
+        st.session_state.admin_selected_pago_id = None
+
     codigo = st.text_input("Código de voucher", placeholder="Ej: VCH-20260316-AB12CD34")
 
     if codigo and st.button("Buscar voucher", type="primary"):
-        pago = Pago.get_by_voucher(codigo.strip())
+        pago_data = Pago.get_by_voucher(codigo.strip())
 
-        if not pago:
+        if not pago_data:
             st.error("No se encontró un voucher con ese código.")
-            return
-
-        if pago.validado:
-            st.info("Este voucher ya fue validado previamente.")
-        mostrar_voucher(pago.id)
+            st.session_state.admin_selected_pago_id = None
+        else:
+            if pago_data.validado:
+                st.info("Este voucher ya fue validado previamente.")
+            st.session_state.admin_selected_pago_id = pago_data.id
 
     st.markdown("---")
+    
+    # Mostrar detalle si hay uno seleccionado
+    if st.session_state.admin_selected_pago_id:
+        mostrar_voucher(st.session_state.admin_selected_pago_id)
+        if st.button("Cerrar detalle"):
+            st.session_state.admin_selected_pago_id = None
+            st.rerun()
+
     st.subheader("Últimos vouchers pendientes")
     pendientes = Pago.obtener_pendientes_validacion(limit=20)
 
@@ -60,7 +72,11 @@ def mostrar_panel_validacion():
 
     for pago_id, codigo_voucher, email, concepto, monto, fecha_pago in pendientes:
         with st.container(border=True):
-            st.markdown(f"**{codigo_voucher}**")
-            st.caption(f"{email} | {concepto} | S/. {monto:.2f} | {fecha_pago.strftime('%d/%m/%Y %H:%M')}")
-            if st.button("Ver detalle", key=f"ver_pago_admin_{pago_id}"):
-                mostrar_voucher(pago_id)
+            col_info, col_btn = st.columns([4, 1])
+            with col_info:
+                st.markdown(f"**{codigo_voucher}**")
+                st.caption(f"{email} | {concepto} | S/. {monto:.2f} | {fecha_pago.strftime('%d/%m/%Y %H:%M')}")
+            with col_btn:
+                if st.button("Ver detalle", key=f"ver_pago_admin_{pago_id}"):
+                    st.session_state.admin_selected_pago_id = pago_id
+                    st.rerun()

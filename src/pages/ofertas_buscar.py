@@ -107,11 +107,15 @@ def buscar_ofertas():
             e.ruc as empresa_ruc,
             e.logo_url,
             e.sitio_web,
-            COUNT(p.id) as total_postulaciones,
-            BOOL_OR(p.egresado_id = (SELECT id FROM egresados WHERE usuario_id = %s)) as ya_postulado
+            COUNT(p_all.id) as total_postulaciones,
+            p_user.estado as mi_estado,
+            p_user.fecha_postulacion as mi_fecha_postulacion,
+            p_user.comentario_revision as mi_comentario
         FROM ofertas o
         JOIN empresas e ON o.empresa_id = e.id
-        LEFT JOIN postulaciones p ON o.id = p.oferta_id
+        LEFT JOIN postulaciones p_all ON o.id = p_all.oferta_id
+        LEFT JOIN postulaciones p_user ON o.id = p_user.oferta_id 
+            AND p_user.egresado_id = (SELECT id FROM egresados WHERE usuario_id = %s)
         WHERE o.activa = true
         AND o.fecha_limite_postulacion >= CURRENT_DATE
     """
@@ -151,7 +155,8 @@ def buscar_ofertas():
         GROUP BY 
             o.id, o.titulo, o.descripcion, o.tipo, o.modalidad, o.salario_min, 
             o.salario_max, o.fecha_publicacion, o.fecha_limite_postulacion, 
-            o.requisitos, o.ubicacion, e.razon_social, e.ruc, e.logo_url, e.sitio_web
+            o.requisitos, o.ubicacion, e.razon_social, e.ruc, e.logo_url, e.sitio_web,
+            p_user.estado, p_user.fecha_postulacion, p_user.comentario_revision
         ORDER BY o.fecha_publicacion DESC
         LIMIT 50
     """
@@ -200,13 +205,15 @@ def mostrar_tarjeta_oferta(oferta):
 
         with col3:
             st.write("") # Espaciador
-            if oferta['ya_postulado']:
-                st.success("✅ Ya postulado")
-                if st.button("Ver Seguimiento", key=f"seg_{oferta['id']}"):
-                    st.session_state.current_page = "postulaciones_seguimiento"
-                    st.rerun()
+            if oferta.get('mi_estado'):
+                st.success(f"✅ Postulado")
+                with st.expander("📝 Detalle Seguimiento"):
+                    st.write(f"**Estado:** {oferta['mi_estado'].replace('_', ' ').capitalize()}")
+                    st.write(f"**Fecha:** {oferta['mi_fecha_postulacion'].strftime('%d/%m/%Y')}")
+                    if oferta.get('mi_comentario'):
+                        st.info(f"**Nota:** {oferta['mi_comentario']}")
             else:
-                if st.button("Postular Ahora", key=f"post_{oferta['id']}", type="primary"):
+                if st.button("Postular Ahora", key=f"post_{oferta['id']}", type="primary", use_container_width=True):
                     postular_a_oferta(oferta['id'])
 
             salario_txt = "No especificado"

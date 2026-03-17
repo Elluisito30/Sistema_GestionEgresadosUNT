@@ -10,7 +10,7 @@ import streamlit as st
 
 from src.models.pago import Pago
 from src.utils.database import get_db_cursor
-from src.utils.pdf_generator import generar_pdf_voucher_pago
+from src.utils.pdf_generator import generar_pdf_voucher_pago, generar_pdf_voucher_simple
 from src.utils.qr_generator import QRGenerator
 from src.utils.session import add_notification
 from src.utils.excel_generator import generar_excel_pagos
@@ -40,15 +40,18 @@ def show():
             configurar_pagos()
 
     else:
-        tab1, tab2 = st.tabs([
-            "📋 Mis Pagos",
-            "🎟️ Generar Voucher",
+        # Si venimos redirigidos de eventos, informar al usuario
+        tab_historial, tab_generar = st.tabs([
+            "📋 Mi Historial",
+            "➕ Generar Voucher",
         ])
 
-        with tab1:
+        with tab_historial:
+            if st.session_state.get('pago_referencia_id'):
+                st.info("💡 Te hemos redirigido aquí para completar tu inscripción. Por favor, ve a la pestaña **'Generar Voucher'**.")
             mostrar_mis_pagos(user["id"])
 
-        with tab2:
+        with tab_generar:
             generar_voucher_form(user["id"])
 
 
@@ -80,29 +83,73 @@ def mostrar_mis_pagos(usuario_id):
         ],
     )
 
-    df["Monto"] = df["Monto"].apply(lambda x: f"S/. {x:,.2f}")
-    df["Fecha"] = pd.to_datetime(df["Fecha"]).dt.strftime("%d/%m/%Y %H:%M")
-    df["Pagado"] = df["Pagado"].apply(lambda x: "✅" if x else "❌")
-    df["Validado"] = df["Validado"].apply(lambda x: "✅" if x else "❌")
+    # Formatear datos para la tabla visual
+    df_display = df.copy()
+    df_display["Monto"] = df_display["Monto"].apply(lambda x: f"S/. {x:,.2f}")
+    df_display["Fecha"] = pd.to_datetime(df_display["Fecha"]).dt.strftime("%d/%m/%Y %H:%M")
 
     st.dataframe(
-        df[["Fecha", "Descripción", "Concepto", "Monto", "Código Voucher", "Pagado", "Validado"]],
+        df_display[["Fecha", "Descripción", "Concepto", "Monto", "Código Voucher", "Pagado", "Validado"]],
+        column_config={
+            "Pagado": st.column_config.CheckboxColumn("Pagado"),
+            "Validado": st.column_config.CheckboxColumn("Validado"),
+        },
         use_container_width=True,
         hide_index=True,
     )
 
-    for pago in pagos:
-        if pago[5]:
-            if st.button(f"📄 Ver Voucher {pago[5]}", key=f"v_{pago[0]}"):
-                mostrar_voucher(pago[0])
+    st.markdown("### 🎟️ Mis Vouchers Disponibles")
+    cols = st.columns(2)
+    for i, pago in enumerate(pagos):
+        if pago[5]: # Si tiene código de voucher
+            pago_id = pago[0]
+            is_validado = pago[7]
+            
+            with cols[i % 2]:
+                with st.container(border=True):
+                    col_text, col_status = st.columns([3, 1])
+                    with col_text:
+                        st.write(f"**Voucher:** `{pago[5]}`")
+                        st.write(f"**Concepto:** {pago[8]}") # Descripción
+                        st.write(f"**Monto:** {df_display.iloc[i]['Monto']}")
+                    
+                    with col_status:
+                        if is_validado:
+                            st.success("VALIDADO")
+                        else:
+                            st.warning("PENDIENTE")
+                    
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        _, pdf_bytes = _build_pdf_bytes_for_pago(pago_id)
+                        if pdf_bytes:
+                            st.download_button(
+                                "📥 Descargar PDF",
+                                data=pdf_bytes,
+                                file_name=f"voucher_{pago[5]}.pdf",
+                                mime="application/pdf",
+                                key=f"btn_dl_{pago_id}",
+                                use_container_width=True,
+                                type="primary"
+                            )
+                    with c2:
+                        if st.button("📧 Enviar Correo", key=f"btn_mail_{pago_id}", use_container_width=True):
+                            enviar_voucher_email(pago_id)
 
 
 def generar_voucher_form(usuario_id):
     """Formulario para generar un nuevo voucher."""
     st.subheader("Generar Nuevo Voucher")
 
+    # Obtener valores pre-seleccionados de la sesión si existen
+    default_concepto = st.session_state.get('pago_concepto', 'certificado')
+    
     with st.form("form_voucher"):
-        concepto = st.selectbox("Concepto de Pago", options=["certificado", "membresia", "evento"])
+        # Mapeo de conceptos para el index del selectbox
+        conceptos_lista = ["certificado", "membresia", "evento"]
+        idx_concepto = conceptos_lista.index(default_concepto) if default_concepto in conceptos_lista else 0
+        
+        concepto = st.selectbox("Concepto de Pago", options=conceptos_lista, index=idx_concepto)
 
         if concepto == "evento":
             with get_db_cursor() as cur:
@@ -120,7 +167,13 @@ def generar_voucher_form(usuario_id):
 
             if eventos:
                 evento_opciones = {f"{e[1]} - S/. {e[2]:.2f}": e[0] for e in eventos}
-                evento_seleccionado = st.selectbox("Seleccionar Evento", options=list(evento_opciones.keys()))
+                
+                # Pre-seleccionar el evento si viene de la sesión
+                ref_id = st.session_state.get('pago_referencia_id')
+                default_ev_label = next((k for k, v in evento_opciones.items() if v == ref_id), list(evento_opciones.keys())[0])
+                idx_ev = list(evento_opciones.keys()).index(default_ev_label)
+                
+                evento_seleccionado = st.selectbox("Seleccionar Evento", options=list(evento_opciones.keys()), index=idx_ev)
                 monto = next(e[2] for e in eventos if e[0] == evento_opciones[evento_seleccionado])
                 referencia_id = evento_opciones[evento_seleccionado]
             else:
@@ -208,7 +261,33 @@ def procesar_pago(usuario_id, concepto, referencia_id, monto):
                 )
 
         add_notification(f"Pago procesado exitosamente. Código: {pago.codigo_voucher}", "success")
-        mostrar_voucher(pago.id)
+        
+        # Limpiar referencias de pago tras éxito
+        if 'pago_referencia_id' in st.session_state:
+            del st.session_state.pago_referencia_id
+        if 'pago_concepto' in st.session_state:
+            del st.session_state.pago_concepto
+
+        # Mostrar mensaje de éxito y botón de descarga directa (sin vista previa)
+        st.success(f"¡Voucher {pago.codigo_voucher} generado con éxito!")
+        
+        st.info("Ya puedes descargar tu comprobante oficial en PDF o enviarlo a tu correo.")
+        c1, c2 = st.columns(2)
+        with c1:
+            _, pdf_bytes = _build_pdf_bytes_for_pago(pago.id)
+            if pdf_bytes:
+                st.download_button(
+                    "📥 Descargar Voucher PDF",
+                    data=pdf_bytes,
+                    file_name=f"voucher_{pago.codigo_voucher}.pdf",
+                    mime="application/pdf",
+                    type="primary",
+                    use_container_width=True,
+                    key=f"dl_after_gen_{pago.id}"
+                )
+        with c2:
+            if st.button("📧 Enviar por Correo", use_container_width=True, key=f"mail_after_gen_{pago.id}"):
+                enviar_voucher_email(pago.id)
 
     except Exception as e:
         add_notification(f"Error al procesar pago: {str(e)}", "error")
@@ -220,73 +299,66 @@ def _build_pdf_bytes_for_pago(pago_id):
         return None, None
 
     qr_bytes = QRGenerator.generate_voucher_qr(detalle["codigo_voucher"])
-    pdf_bytes = generar_pdf_voucher_pago(detalle, qr_bytes)
+    # Usamos el nuevo formato simple solicitado por el usuario
+    pdf_bytes = generar_pdf_voucher_simple(detalle, qr_bytes)
     return detalle, pdf_bytes
 
 
 def mostrar_voucher(pago_id):
-    """Muestra el voucher generado."""
+    """Muestra el detalle del voucher (usado principalmente por administradores)."""
     detalle = Pago.obtener_detalle_voucher(pago_id)
-
     if not detalle:
         st.error("Voucher no encontrado")
         return
 
-    st.subheader(f"Voucher: {detalle['codigo_voucher']}")
+    with st.expander(f"Detalle del Voucher: {detalle['codigo_voucher']}", expanded=True):
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            st.write(f"**Egresado:** {detalle['email']}")
+            st.write(f"**Concepto:** {detalle['concepto'].upper()}")
+            st.write(f"**Monto:** S/. {detalle['monto']:.2f}")
+            st.write(f"**Fecha:** {detalle['fecha_pago'].strftime('%d/%m/%Y %H:%M')}")
+            st.write(f"**Estado:** {'✅ VALIDADO' if detalle['validado'] else '⏳ PENDIENTE'}")
+        
+        with col2:
+            qr_bytes = QRGenerator.generate_voucher_qr(detalle["codigo_voucher"])
+            st.image(qr_bytes, width=120)
 
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.markdown("### Datos del Pago")
-        st.markdown(f"**Concepto:** {detalle['concepto']}")
-        st.markdown(f"**Monto:** S/. {detalle['monto']:.2f}")
-        st.markdown(f"**Fecha:** {detalle['fecha_pago'].strftime('%d/%m/%Y %H:%M')}")
-        st.markdown(f"**Usuario:** {detalle['email']}")
-        st.markdown(f"**Estado:** {'✅ Válido' if detalle['validado'] else '❌ No validado'}")
-
-    with col2:
-        st.markdown("### Código QR")
-        qr_bytes = QRGenerator.generate_voucher_qr(detalle["codigo_voucher"])
-        st.image(qr_bytes, width=200)
-
-    _, pdf_bytes = _build_pdf_bytes_for_pago(pago_id)
-
-    col3, col4, col5 = st.columns(3)
-
-    with col3:
-        if pdf_bytes:
-            st.download_button(
-                "📥 Descargar PDF",
-                data=pdf_bytes,
-                file_name=f"voucher_{detalle['codigo_voucher']}.pdf",
-                mime="application/pdf",
-                use_container_width=True,
-                key=f"descargar_pdf_{pago_id}",
-            )
-        else:
-            st.warning("PDF no disponible")
-
-    with col4:
-        if st.button("🔄 Validar Voucher", use_container_width=True, key=f"validar_{pago_id}"):
-            validar_voucher(pago_id)
-
-    with col5:
-        if st.button("📧 Enviar por Email", use_container_width=True, key=f"mail_{pago_id}"):
-            enviar_voucher_email(pago_id)
+        # Acciones simples y horizontales
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            _, pdf_bytes = _build_pdf_bytes_for_pago(pago_id)
+            if pdf_bytes:
+                st.download_button("📥 PDF", data=pdf_bytes, file_name=f"voucher_{detalle['codigo_voucher']}.pdf", 
+                                   mime="application/pdf", key=f"dl_preview_{pago_id}", use_container_width=True)
+        with c2:
+            if st.button("🔄 Validar", key=f"val_preview_{pago_id}", use_container_width=True):
+                validar_voucher(pago_id)
+        with c3:
+            if st.button("📧 Email", key=f"mail_preview_{pago_id}", use_container_width=True):
+                enviar_voucher_email(pago_id)
 
 
 def validar_voucher(pago_id):
     """Valida un voucher (marca como usado)."""
     try:
+        # Debugging: verificar que entra a la función
+        # st.write(f"Intentando validar pago_id: {pago_id}")
+        
         codigo = Pago.validar_por_id(pago_id)
         if codigo:
-            add_notification(f"Voucher {codigo} validado exitosamente", "success")
+            st.success(f"Voucher {codigo} validado exitosamente")
+            # Forzar actualización inmediata en el estado de Streamlit
+            st.session_state[f"validado_{pago_id}"] = True
+            
+            import time
+            time.sleep(1)
             st.rerun()
         else:
-            add_notification("No se pudo validar el voucher", "error")
+            st.error("No se pudo validar el voucher en la base de datos.")
 
     except Exception as e:
-        add_notification(f"Error al validar: {str(e)}", "error")
+        st.error(f"Error técnico al validar: {str(e)}")
 
 
 def enviar_voucher_email(pago_id):
@@ -304,11 +376,13 @@ def mostrar_todos_pagos():
         st.info("No hay pagos registrados")
         return
 
+    # Crear DataFrame limpio
     df = pd.DataFrame(
         pagos,
         columns=["ID", "Usuario", "Concepto", "Monto", "Fecha", "Código", "Pagado", "Validado"],
     )
 
+    # Métricas antes de formatear para visualización
     total_recaudado = df[df["Pagado"] == True]["Monto"].sum()
     total_pagos = len(df[df["Pagado"] == True])
 
@@ -319,12 +393,13 @@ def mostrar_todos_pagos():
 
     st.markdown("---")
     
+    # Reportes
     col_dl1, col_dl2, col_dl3 = st.columns([1, 1, 4])
     with col_dl1:
         pagos_reporte = Pago.obtener_reporte_pagos()
         excel_bytes = generar_excel_pagos(pagos_reporte)
         st.download_button(
-            "📊 Descargar Excel",
+            "📊 Excel",
             data=excel_bytes,
             file_name=f"reporte_pagos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -335,21 +410,31 @@ def mostrar_todos_pagos():
         from src.utils.pdf_generator import generar_pdf_reporte_pagos
         pdf_bytes = generar_pdf_reporte_pagos(pagos_reporte)
         st.download_button(
-            "📄 Descargar PDF",
+            "📄 PDF",
             data=pdf_bytes,
             file_name=f"reporte_pagos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
             mime="application/pdf",
             use_container_width=True,
         )
 
-    st.markdown("---")
+    st.markdown("<br>", unsafe_allow_html=True)
 
-    df["Monto"] = df["Monto"].apply(lambda x: f"S/. {x:,.2f}")
-    df["Fecha"] = pd.to_datetime(df["Fecha"]).dt.strftime("%d/%m/%Y")
-    df["Pagado"] = df["Pagado"].apply(lambda x: "✅" if x else "❌")
-    df["Validado"] = df["Validado"].apply(lambda x: "✅" if x else "❌")
-
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    # Formatear DataFrame para la tabla visual
+    df_display = df.copy()
+    df_display["Monto"] = df_display["Monto"].apply(lambda x: f"S/. {x:,.2f}")
+    df_display["Fecha"] = pd.to_datetime(df_display["Fecha"]).dt.strftime("%d/%m/%Y")
+    
+    # Usar st.dataframe con configuración de columnas para mostrar checks reales
+    st.dataframe(
+        df_display,
+        column_config={
+            "ID": None,
+            "Pagado": st.column_config.CheckboxColumn("Pagado"),
+            "Validado": st.column_config.CheckboxColumn("Validado"),
+        },
+        use_container_width=True, 
+        hide_index=True
+    )
 
 
 def mostrar_estadisticas_pagos():
