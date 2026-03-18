@@ -13,11 +13,11 @@ def get_env(*keys, default=None):
 
 # Configuración de la Base de Datos
 DB_CONFIG = {
-    "host": get_env("DB_HOST", default="localhost"),
-    "database": get_env("DB_NAME", "POSTGRES_DB", default="egresados_unt_db"),
-    "user": get_env("DB_USER", "POSTGRES_USER", default="postgres"),
-    "password": get_env("DB_PASSWORD", "POSTGRES_PASSWORD", default="postgres"),
-    "port": get_env("DB_PORT", default="5432")
+    "host": str(get_env("DB_HOST", default="localhost")),
+    "database": str(get_env("DB_NAME", "POSTGRES_DB", default="egresados_unt_db")),
+    "user": str(get_env("DB_USER", "POSTGRES_USER", default="postgres")),
+    "password": str(get_env("DB_PASSWORD", "POSTGRES_PASSWORD", default="postgres")),
+    "port": str(get_env("DB_PORT", default="5432"))
 }
 
 # Otras configuraciones

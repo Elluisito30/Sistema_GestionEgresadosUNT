@@ -9,6 +9,7 @@ class Oferta:
     """Clase que representa una oferta laboral."""
     
     def __init__(self, id=None, empresa_id=None, publicado_por=None,
+                 egresado_propietario_id=None,
                  titulo=None, descripcion=None, requisitos=None,
                  tipo=None, modalidad=None, ubicacion=None,
                  salario_min=None, salario_max=None,
@@ -17,6 +18,7 @@ class Oferta:
         self.id = id
         self.empresa_id = empresa_id
         self.publicado_por = publicado_por
+        self.egresado_propietario_id = egresado_propietario_id
         self.titulo = titulo
         self.descripcion = descripcion
         self.requisitos = requisitos
@@ -149,31 +151,32 @@ class Oferta:
                         salario_max = %s,
                         fecha_limite_postulacion = %s,
                         activa = %s,
-                        carrera_objetivo = %s
+                        carrera_objetivo = %s,
+                        egresado_propietario_id = %s
                     WHERE id = %s
                 """, (
                     self.titulo, self.descripcion, self.requisitos,
                     self.tipo, self.modalidad, self.ubicacion,
                     self.salario_min, self.salario_max,
                     self.fecha_limite_postulacion, self.activa,
-                    self.carrera_objetivo, self.id
+                    self.carrera_objetivo, self.egresado_propietario_id, self.id
                 ))
         else:
             with get_db_cursor(commit=True) as cur:
                 cur.execute("""
                     INSERT INTO ofertas (
-                        empresa_id, publicado_por, titulo, descripcion,
-                        requisitos, tipo, modalidad, ubicacion,
-                        salario_min, salario_max, fecha_limite_postulacion,
-                        carrera_objetivo
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        empresa_id, publicado_por, egresado_propietario_id,
+                        titulo, descripcion, requisitos, tipo, modalidad,
+                        ubicacion, salario_min, salario_max,
+                        fecha_limite_postulacion, carrera_objetivo
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
                 """, (
-                    self.empresa_id, self.publicado_por, self.titulo,
-                    self.descripcion, self.requisitos, self.tipo,
-                    self.modalidad, self.ubicacion, self.salario_min,
-                    self.salario_max, self.fecha_limite_postulacion,
-                    self.carrera_objetivo
+                    self.empresa_id, self.publicado_por, self.egresado_propietario_id,
+                    self.titulo, self.descripcion, self.requisitos,
+                    self.tipo, self.modalidad, self.ubicacion,
+                    self.salario_min, self.salario_max,
+                    self.fecha_limite_postulacion, self.carrera_objetivo
                 ))
                 self.id = cur.fetchone()[0]
         

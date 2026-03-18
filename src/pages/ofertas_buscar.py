@@ -255,6 +255,7 @@ def postular_a_oferta(oferta_id):
     
     usuario_id = st.session_state.user['id']
     
+    success = False
     try:
         with get_db_cursor(commit=True) as cur:
             # Obtener el ID del egresado
@@ -279,7 +280,9 @@ def postular_a_oferta(oferta_id):
                 add_notification("¡Postulación enviada con éxito!", "success")
             else:
                 add_notification("Ya estabas postulado a esta oferta.", "warning")
-            st.rerun()
-            
+            success = True
     except Exception as e:
-        add_notification(f"Error al postular: {str(e)}", "error")
+        add_notification(f"Error al postular: {e}", "error")
+
+    if success:
+        st.rerun()

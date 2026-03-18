@@ -61,14 +61,32 @@ def mostrar_encuestas_pendientes(egresado_id):
     
     st.subheader("Encuestas Pendientes")
     
+    # Verificar si la columna dirigida_a existe para evitar errores de migración
+    has_dirigida_a = False
+    try:
+        with get_db_cursor() as cur:
+            cur.execute("""
+                SELECT 1 FROM information_schema.columns 
+                WHERE table_name='encuestas' AND column_name='dirigida_a'
+            """)
+            has_dirigida_a = bool(cur.fetchone())
+    except:
+        pass
+
     with get_db_cursor() as cur:
-        cur.execute("""
+        # Debug: Verificar si hay encuestas activas
+        cur.execute("SELECT COUNT(*) FROM encuestas WHERE activa = true")
+        total_activas = cur.fetchone()[0]
+        
+        query = """
             SELECT 
                 e.id,
                 e.titulo,
                 e.descripcion,
                 e.fecha_inicio,
                 e.fecha_fin,
+                e.categoria,
+                e.es_obligatoria,
                 (
                     SELECT COUNT(*) 
                     FROM respuestas_encuesta r 
@@ -81,9 +99,23 @@ def mostrar_encuestas_pendientes(egresado_id):
                     WHERE p.encuesta_id = e.id
                 ) as total_preguntas
             FROM encuestas e
-            WHERE e.activa = true
-            AND e.fecha_inicio <= CURRENT_DATE
-            AND e.fecha_fin >= CURRENT_DATE
+            WHERE COALESCE(e.activa, true) = true
+            AND DATE(e.fecha_inicio) <= CURRENT_DATE
+            AND DATE(e.fecha_fin) >= (CURRENT_DATE - INTERVAL '1 day')
+        """
+        
+        params = [egresado_id]
+        
+        if has_dirigida_a:
+            query += """
+                AND (COALESCE(e.dirigida_a, 'todos') = 'todos' OR EXISTS (
+                    SELECT 1 FROM asignaciones_encuesta a 
+                    WHERE a.encuesta_id = e.id AND a.egresado_id = %s
+                ))
+            """
+            params.append(egresado_id)
+            
+        query += """
             AND NOT EXISTS (
                 SELECT 1 
                 FROM respuestas_encuesta r 
@@ -96,38 +128,50 @@ def mostrar_encuestas_pendientes(egresado_id):
                     WHERE p.encuesta_id = e.id
                 )
             )
-            ORDER BY e.fecha_fin ASC
-        """, (egresado_id, egresado_id))
+            ORDER BY e.es_obligatoria DESC, e.fecha_fin ASC
+        """
+        params.append(egresado_id)
+        
+        cur.execute(query, params)
         
         encuestas = cur.fetchall()
         
         if not encuestas:
-            st.success("¡No tienes encuestas pendientes! Gracias por mantenerte al día.")
+            if total_activas > 0:
+                st.info(f"Tienes {total_activas} encuestas activas en el sistema, pero ninguna está asignada a ti o está fuera de fecha.")
+            else:
+                st.success("¡No tienes encuestas pendientes! Gracias por mantenerte al día.")
             return
         
         for encuesta in encuestas:
-            with st.container():
+            with st.container(border=True):
                 col1, col2 = st.columns([3, 1])
                 
                 with col1:
-                    st.markdown(f"### {encuesta[1]}")
-                    st.markdown(encuesta[2] or "")
+                    obligatoria_tag = "⚠️ [OBLIGATORIA]" if encuesta[6] else ""
+                    st.markdown(f"### {encuesta[1]} {obligatoria_tag}")
+                    st.caption(f"Categoría: {encuesta[5]}")
+                    st.markdown(encuesta[2] or "Sin descripción")
                     
                     dias_restantes = (encuesta[4] - datetime.now().date()).days
                     st.markdown(f"📅 **Vence en:** {dias_restantes} días")
                     
-                    progreso = encuesta[5] / encuesta[6] if encuesta[6] > 0 else 0
-                    st.progress(progreso, text=f"Progreso: {encuesta[5]}/{encuesta[6]} preguntas")
+                    progreso = encuesta[7] / encuesta[8] if encuesta[8] > 0 else 0
+                    st.progress(progreso, text=f"Progreso: {encuesta[7]}/{encuesta[8]} preguntas")
                 
                 with col2:
-                    if encuesta[5] > 0:
-                        st.button("📝 Continuar", key=f"cont_{encuesta[0]}", 
-                                 on_click=responder_encuesta, args=(encuesta[0], egresado_id))
+                    st.write("") # Spacer
+                    st.write("") # Spacer
+                    if encuesta[7] > 0:
+                        if st.button("📝 Continuar", key=f"ans_cont_{encuesta[0]}", 
+                                 use_container_width=True):
+                            responder_encuesta(encuesta[0], egresado_id)
+                            st.rerun()
                     else:
-                        st.button("🎯 Iniciar", key=f"start_{encuesta[0]}", type="primary",
-                                 on_click=responder_encuesta, args=(encuesta[0], egresado_id))
-                
-                st.markdown("---")
+                        if st.button("🎯 Iniciar", key=f"ans_start_{encuesta[0]}", type="primary",
+                                 use_container_width=True):
+                            responder_encuesta(encuesta[0], egresado_id)
+                            st.rerun()
 
 def mostrar_encuestas_completadas(egresado_id):
     """Muestra las encuestas ya completadas por el egresado."""
@@ -165,7 +209,7 @@ def mostrar_encuestas_completadas(egresado_id):
                     st.markdown(f"✅ **Completada:** {encuesta[4].strftime('%d/%m/%Y')}")
                 
                 with col2:
-                    if st.button("📋 Ver respuestas", key=f"view_{encuesta[0]}"):
+                    if st.button("📋 Ver respuestas", key=f"ans_view_{encuesta[0]}"):
                         ver_respuestas_encuesta(encuesta[0], egresado_id)
                 
                 st.markdown("---")
@@ -205,8 +249,6 @@ def responder_encuesta(encuesta_id, egresado_id):
             break
     else:
         st.session_state.encuesta_actual['pregunta_actual'] = len(preguntas_ids)
-    
-    st.rerun()
 
 def mostrar_pregunta_actual():
     """Muestra la pregunta actual de la encuesta."""
@@ -247,64 +289,67 @@ def mostrar_pregunta_actual():
         titulo = cur.fetchone()[0]
     
     st.subheader(f"Encuesta: {titulo}")
-    st.progress((pregunta_idx + 1) / len(preguntas), 
-               text=f"Pregunta {pregunta_idx + 1} de {len(preguntas)}")
     
-    st.markdown(f"### {texto}")
-    
-    # Mostrar según tipo de respuesta
-    respuesta_guardada = encuesta['respuestas'].get(pregunta_id, "")
-    
-    if tipo == 'texto':
-        respuesta = st.text_area("Tu respuesta:", value=respuesta_guardada, key=f"resp_{pregunta_id}")
-    
-    elif tipo == 'opcion_multiple':
-        if isinstance(opciones, list):
-            opciones_list = opciones
-        else:
-            opciones_list = json.loads(opciones) if opciones else []
+    col_p1, col_p2 = st.columns([4, 1])
+    with col_p1:
+        st.progress((pregunta_idx + 1) / len(preguntas), 
+                   text=f"Pregunta {pregunta_idx + 1} de {len(preguntas)}")
+    with col_p2:
+        st.markdown(f"**{int(((pregunta_idx + 1) / len(preguntas)) * 100)}%**")
 
-        if not opciones_list:
-            st.warning("Esta pregunta no tiene opciones configuradas.")
-            respuesta = respuesta_guardada
-        else:
-            respuesta = st.radio(
-                "Selecciona una opción:",
-                opciones_list,
-                index=opciones_list.index(respuesta_guardada) if respuesta_guardada in opciones_list else 0,
-                key=f"resp_{pregunta_id}"
-            )
-    
-    elif tipo == 'escala':
-        respuesta = st.slider("Selecciona un valor:", 1, 10, 
-                              value=int(respuesta_guardada) if respuesta_guardada else 5,
-                              key=f"resp_{pregunta_id}")
-    
-    else:
-        respuesta = st.text_input("Tu respuesta:", value=respuesta_guardada, key=f"resp_{pregunta_id}")
-    
-    # Botones de navegación
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        if pregunta_idx > 0:
-            if st.button("⬅️ Anterior"):
-                guardar_respuesta(encuesta_id, egresado_id, pregunta_id, respuesta)
-                encuesta['pregunta_actual'] -= 1
+    with st.container(border=True):
+        st.markdown(f"### {texto}")
+        
+        # Obtener respuesta previa si existe
+        respuesta_previa = encuesta['respuestas'].get(pregunta_id, "")
+        
+        respuesta = None
+        if tipo == 'texto':
+            respuesta = st.text_area("Su respuesta:", value=respuesta_previa, height=150, placeholder="Escriba aquí...")
+        elif tipo == 'opcion_multiple':
+            try:
+                ops = json.loads(opciones) if isinstance(opciones, str) else opciones
+            except:
+                ops = []
+            
+            index_previa = 0
+            if respuesta_previa in ops:
+                index_previa = ops.index(respuesta_previa)
+            
+            respuesta = st.radio("Seleccione una opción:", options=ops, index=index_previa)
+        elif tipo == 'escala':
+            val_previa = 5
+            try:
+                val_previa = int(respuesta_previa)
+            except:
+                pass
+            respuesta = st.select_slider("Calificación (1 al 10):", options=list(range(1, 11)), value=val_previa)
+        
+        st.markdown("---")
+        c1, c2, c3 = st.columns([1, 1, 1])
+        
+        with c1:
+            if pregunta_idx > 0:
+                if st.button("⬅️ Anterior", use_container_width=True):
+                    encuesta['pregunta_actual'] -= 1
+                    st.rerun()
+        
+        with c2:
+            if st.button("💾 Guardar y Salir", use_container_width=True):
+                guardar_respuesta(encuesta_id, egresado_id, pregunta_id, str(respuesta))
+                del st.session_state.encuesta_actual
+                add_notification("Progreso guardado correctamente", "info")
                 st.rerun()
-    
-    with col2:
-        if st.button("💾 Guardar y continuar", type="primary", use_container_width=True):
-            guardar_respuesta(encuesta_id, egresado_id, pregunta_id, respuesta)
-            if pregunta_idx < len(preguntas) - 1:
-                encuesta['pregunta_actual'] += 1
-            st.rerun()
-    
-    with col3:
-        if st.button("⏸️ Guardar y salir"):
-            guardar_respuesta(encuesta_id, egresado_id, pregunta_id, respuesta)
-            del st.session_state.encuesta_actual
-            st.rerun()
+        
+        with c3:
+            label_sig = "Finalizar ✅" if pregunta_idx == len(preguntas) - 1 else "Siguiente ➡️"
+            if st.button(label_sig, type="primary", use_container_width=True):
+                if respuesta or tipo != 'texto': # Validar que haya respondido algo
+                    guardar_respuesta(encuesta_id, egresado_id, pregunta_id, str(respuesta))
+                    encuesta['pregunta_actual'] += 1
+                    st.rerun()
+                else:
+                    st.warning("Por favor, responda la pregunta antes de continuar.")
 
 def guardar_respuesta(encuesta_id, egresado_id, pregunta_id, respuesta):
     """Guarda la respuesta de una pregunta."""
@@ -335,7 +380,8 @@ def guardar_respuesta(encuesta_id, egresado_id, pregunta_id, respuesta):
                 """, (encuesta_id, pregunta_id, egresado_id, str(respuesta)))
             
             # Actualizar sesión
-            st.session_state.encuesta_actual['respuestas'][pregunta_id] = respuesta
+            if 'encuesta_actual' in st.session_state:
+                st.session_state.encuesta_actual['respuestas'][pregunta_id] = respuesta
             
     except Exception as e:
         add_notification(f"Error al guardar respuesta: {str(e)}", "error")

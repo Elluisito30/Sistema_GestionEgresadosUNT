@@ -23,16 +23,96 @@ def show():
     st.title("👤 Mi Perfil")
     
     # Tabs para organizar la información
-    tab1, tab2, tab3 = st.tabs(["📋 Información Personal", "🔐 Seguridad", "📊 Actividad"])
+    tabs_labels = ["📋 Información Personal", "🔐 Seguridad", "📊 Actividad"]
+    if rol == 'egresado':
+        tabs_labels.append("🏢 Mi Situación Laboral")
     
-    with tab1:
+    tabs = st.tabs(tabs_labels)
+    
+    with tabs[0]:
         mostrar_info_personal(user, rol)
     
-    with tab2:
+    with tabs[1]:
         mostrar_seguridad(user)
     
-    with tab3:
+    with tabs[2]:
         mostrar_actividad(user)
+        
+    if rol == 'egresado':
+        with tabs[3]:
+            mostrar_situacion_laboral(user)
+
+def mostrar_situacion_laboral(user):
+    """Muestra las empresas donde el egresado ha sido seleccionado."""
+    
+    st.subheader("🏢 Mi Situación Laboral Actual")
+    
+    with get_db_cursor() as cur:
+        # Obtener postulaciones donde el egresado fue seleccionado
+        cur.execute("""
+            SELECT 
+                o.titulo AS puesto,
+                e.razon_social AS empresa,
+                p.fecha_estado_actual AS fecha_seleccion,
+                p.comentario_revision,
+                e.sitio_web,
+                e.ruc
+            FROM postulaciones p
+            JOIN ofertas o ON p.oferta_id = o.id
+            JOIN empresas e ON o.empresa_id = e.id
+            JOIN egresados eg ON p.egresado_id = eg.id
+            WHERE eg.usuario_id = %s AND p.estado = 'seleccionado'
+            ORDER BY p.fecha_estado_actual DESC
+        """, (user['id'],))
+        
+        empleos_empresa = cur.fetchall()
+        
+        # Obtener postulaciones de emprendimientos de egresados donde fue seleccionado
+        cur.execute("""
+            SELECT 
+                o.titulo AS puesto,
+                'Emprendimiento de Egresado' AS empresa,
+                p.fecha_estado_actual AS fecha_seleccion,
+                p.comentario_revision,
+                NULL as sitio_web,
+                NULL as ruc
+            FROM postulaciones p
+            JOIN ofertas o ON p.oferta_id = o.id
+            JOIN egresados eg_post ON p.egresado_id = eg_post.id
+            WHERE eg_post.usuario_id = %s AND p.estado = 'seleccionado'
+            AND o.egresado_propietario_id IS NOT NULL
+            ORDER BY p.fecha_estado_actual DESC
+        """, (user['id'],))
+        
+        empleos_egresados = cur.fetchall()
+        
+        todos_empleos = empleos_empresa + empleos_egresados
+        
+    if todos_empleos:
+        st.success(f"Actualmente tienes {len(todos_empleos)} procesos finalizados con éxito.")
+        
+        for puesto, empresa, fecha, comentario, web, ruc in todos_empleos:
+            with st.container(border=True):
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.markdown(f"### {puesto}")
+                    st.markdown(f"**Empresa:** {empresa}")
+                    if ruc: st.caption(f"RUC: {ruc}")
+                    st.write(f"📅 **Fecha de ingreso/selección:** {fecha.strftime('%d/%m/%Y')}")
+                
+                with col2:
+                    st.write("") # Spacer
+                    if web:
+                        st.link_button("🌐 Visitar Web", web, use_container_width=True)
+                
+                if comentario:
+                    with st.expander("💬 Ver mensaje de la empresa"):
+                        st.info(comentario)
+    else:
+        st.info("Aún no tienes empleos registrados a través de la plataforma. ¡Sigue postulando!")
+        if st.button("🔍 Buscar Ofertas Ahora"):
+            st.session_state.current_page = "ofertas_buscar"
+            st.rerun()
 
 def mostrar_info_personal(user, rol):
     """Muestra y permite editar la información personal según el rol."""

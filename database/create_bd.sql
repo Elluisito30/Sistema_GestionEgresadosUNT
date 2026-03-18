@@ -100,9 +100,10 @@ CREATE TABLE empleadores (
 -- 5. TABLA OFERTAS LABORALES
 CREATE TABLE ofertas (
     id SERIAL PRIMARY KEY,
-    empresa_id INTEGER NOT NULL REFERENCES empresas(id) ON DELETE CASCADE,
-    publicado_por INTEGER NOT NULL REFERENCES empleadores(id),
-    titulo VARCHAR(255) NOT NULL,
+    empresa_id INTEGER REFERENCES empresas(id) ON DELETE CASCADE,
+    publicado_por INTEGER REFERENCES usuarios(id) ON DELETE SET NULL, -- Puede ser Admin, Empleador o Egresado
+    egresado_propietario_id INTEGER REFERENCES egresados(id) ON DELETE CASCADE, -- Si es publicada por un egresado
+    titulo VARCHAR(200) NOT NULL,
     descripcion TEXT NOT NULL,
     requisitos TEXT,
     tipo tipo_oferta NOT NULL,
@@ -201,10 +202,22 @@ CREATE TABLE encuestas (
     id SERIAL PRIMARY KEY,
     titulo VARCHAR(255) NOT NULL,
     descripcion TEXT,
+    categoria VARCHAR(100),
+    es_obligatoria BOOLEAN DEFAULT FALSE,
+    dirigida_a VARCHAR(50) DEFAULT 'todos', -- 'todos', 'especificos'
     fecha_inicio DATE NOT NULL,
     fecha_fin DATE NOT NULL,
     activa BOOLEAN DEFAULT TRUE,
     creada_por INTEGER REFERENCES usuarios(id)
+);
+
+-- 12.1 TABLA ASIGNACIONES DE ENCUESTA
+CREATE TABLE asignaciones_encuesta (
+    id SERIAL PRIMARY KEY,
+    encuesta_id INTEGER NOT NULL REFERENCES encuestas(id) ON DELETE CASCADE,
+    egresado_id INTEGER NOT NULL REFERENCES egresados(id) ON DELETE CASCADE,
+    fecha_asignacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(encuesta_id, egresado_id)
 );
 
 -- 13. TABLA PREGUNTAS

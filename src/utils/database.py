@@ -18,8 +18,10 @@ class DatabasePool:
     def _init_pool(self):
         if self._pool is None:
             try:
+                # Asegurar que DB_CONFIG sea string UTF-8 si es necesario
+                params = {k: (v.decode('utf-8') if isinstance(v, bytes) else v) for k, v in DB_CONFIG.items()}
                 self._pool = psycopg2.pool.SimpleConnectionPool(
-                    1, 20, **DB_CONFIG
+                    1, 20, **params
                 )
                 print("Pool de conexiones creado exitosamente.")
             except Exception as e:
@@ -42,7 +44,8 @@ class DatabasePool:
                     return self._pool.getconn()
         
         # Fallback a conexión directa si el pool falla
-        return psycopg2.connect(**DB_CONFIG)
+        params = {k: (v.decode('utf-8') if isinstance(v, bytes) else v) for k, v in DB_CONFIG.items()}
+        return psycopg2.connect(**params)
 
     def return_connection(self, conn):
         if self._pool and hasattr(conn, 'cursor'): # Verificar que sea una conexión válida
@@ -86,9 +89,40 @@ def init_critical_tables():
                     fecha_envio TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
                 );
             """)
-            print("Tablas críticas verificadas.")
+
+            # Tabla de asignaciones de encuesta
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS asignaciones_encuesta (
+                    id SERIAL PRIMARY KEY,
+                    encuesta_id INTEGER NOT NULL REFERENCES encuestas(id) ON DELETE CASCADE,
+                    egresado_id INTEGER NOT NULL REFERENCES egresados(id) ON DELETE CASCADE,
+                    fecha_asignacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(encuesta_id, egresado_id)
+                );
+            """)
+            
+            # Asegurar columnas en encuestas
+            cur.execute("ALTER TABLE encuestas ADD COLUMN IF NOT EXISTS dirigida_a VARCHAR(50) DEFAULT 'todos';")
+            cur.execute("ALTER TABLE encuestas ADD COLUMN IF NOT EXISTS categoria VARCHAR(100);")
+            cur.execute("ALTER TABLE encuestas ADD COLUMN IF NOT EXISTS es_obligatoria BOOLEAN DEFAULT FALSE;")
+            
+            # Limpiar valores NULL para encuestas antiguas y forzar vigencia para depuración
+            cur.execute("UPDATE encuestas SET dirigida_a = 'todos' WHERE dirigida_a IS NULL;")
+            cur.execute("UPDATE encuestas SET categoria = 'General' WHERE categoria IS NULL;")
+            cur.execute("UPDATE encuestas SET es_obligatoria = FALSE WHERE es_obligatoria IS NULL;")
+            
+            # Forzar que las encuestas activas estén en rango de fecha actual
+            cur.execute("""
+                UPDATE encuestas 
+                SET fecha_inicio = CURRENT_DATE - INTERVAL '1 day',
+                    fecha_fin = CURRENT_DATE + INTERVAL '30 days'
+                WHERE activa = true;
+            """)
+            
+            print("Tablas críticas verificadas y fechas actualizadas.")
     except Exception as e:
-        print(f"Advertencia en init_critical_tables: {e}")
+        st.error(f"Error crítico en init_critical_tables: {e}")
+        print(f"Error en init_critical_tables: {e}")
 
 @contextmanager
 def get_db_connection():

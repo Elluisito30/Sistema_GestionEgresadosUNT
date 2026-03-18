@@ -48,20 +48,29 @@ def show():
     st.title("📢 Gestión de Ofertas Laborales")
     render_notifications()
 
-    if rol not in ["administrador", "empleador"]:
+    if rol not in ["administrador", "empleador", "egresado"]:
         st.error("No tienes permisos para acceder a esta pagina.")
         return
 
     if rol == "administrador":
         tab1, tab2 = st.tabs(["🔎 Gestión y Analisis", "➕ Nueva Oferta (Admin)"])
-    else:
+    elif rol == "empleador":
         tab1, tab2 = st.tabs(["📋 Mis Ofertas", "➕ Publicar Nueva Oferta"])
+    else: # egresado
+        tab1, tab2 = st.tabs(["📋 Mis Emprendimientos/Ofertas", "➕ Publicar como Egresado"])
 
     with tab1:
         _mostrar_lista_gestion(user, rol)
 
     with tab2:
         _mostrar_formulario_crear(user, rol)
+
+
+def _obtener_id_egresado(usuario_id):
+    with get_db_cursor() as cur:
+        cur.execute("SELECT id FROM egresados WHERE usuario_id = %s", (usuario_id,))
+        row = cur.fetchone()
+        return row[0] if row else None
 
 
 def _obtener_empleador(usuario_id):
@@ -111,17 +120,17 @@ def _buscar_ofertas(rol, user_id, termino=None, estado=None, tipo=None, modalida
             o.salario_max,
             o.fecha_publicacion,
             o.fecha_limite_postulacion,
-            o.activa,
-            o.carrera_objetivo,
-            e.razon_social AS empresa,
-            e.ruc AS empresa_ruc,
-            e.sitio_web,
-            COUNT(p.id) AS postulaciones
-        FROM ofertas o
-        JOIN empresas e ON e.id = o.empresa_id
-        LEFT JOIN postulaciones p ON p.oferta_id = o.id
-        WHERE 1=1
-    """
+        o.activa,
+        o.carrera_objetivo,
+        COALESCE(e.razon_social, 'Emprendimiento Egresado') AS empresa,
+        e.ruc AS empresa_ruc,
+        e.sitio_web,
+        COUNT(p.id) AS postulaciones
+    FROM ofertas o
+    LEFT JOIN empresas e ON e.id = o.empresa_id
+    LEFT JOIN postulaciones p ON p.oferta_id = o.id
+    WHERE 1=1
+"""
     params = []
 
     if rol == "empleador":
@@ -130,6 +139,10 @@ def _buscar_ofertas(rol, user_id, termino=None, estado=None, tipo=None, modalida
             return []
         query += " AND o.empresa_id = %s"
         params.append(empresa_id)
+    elif rol == "egresado":
+        egresado_id = _obtener_id_egresado(user_id)
+        query += " AND o.egresado_propietario_id = %s"
+        params.append(egresado_id)
 
     if termino:
         query += " AND (o.titulo ILIKE %s OR o.descripcion ILIKE %s OR e.razon_social ILIKE %s)"
@@ -168,16 +181,27 @@ def _puede_gestionar_oferta(oferta_id, rol, user_id):
     if rol == "administrador":
         return True
 
-    _, empresa_id = _obtener_empleador(user_id)
-    if not empresa_id:
-        return False
-
-    with get_db_cursor() as cur:
-        cur.execute(
-            "SELECT 1 FROM ofertas WHERE id = %s AND empresa_id = %s",
-            (oferta_id, empresa_id),
-        )
-        return bool(cur.fetchone())
+    if rol == "empleador":
+        _, empresa_id = _obtener_empleador(user_id)
+        if not empresa_id:
+            return False
+        with get_db_cursor() as cur:
+            cur.execute(
+                "SELECT 1 FROM ofertas WHERE id = %s AND empresa_id = %s",
+                (oferta_id, empresa_id),
+            )
+            return bool(cur.fetchone())
+    
+    if rol == "egresado":
+        egresado_id = _obtener_id_egresado(user_id)
+        with get_db_cursor() as cur:
+            cur.execute(
+                "SELECT 1 FROM ofertas WHERE id = %s AND egresado_propietario_id = %s",
+                (oferta_id, egresado_id),
+            )
+            return bool(cur.fetchone())
+    
+    return False
 
 
 def _validar_campos_oferta(titulo, descripcion, fecha_limite, salario_min, salario_max):
@@ -205,18 +229,15 @@ def _mostrar_lista_gestion(user, rol):
     with col4:
         modalidad = st.selectbox("Modalidad", options=["todas"] + MODALIDADES, index=0)
 
-    @st.cache_data(show_spinner=False, ttl=300)
-    def cached_buscar_ofertas(rol, user_id, termino, estado, tipo, modalidad):
-        return _buscar_ofertas(
-            rol=rol,
-            user_id=user_id,
-            termino=termino,
-            estado=estado,
-            tipo=tipo,
-            modalidad=modalidad,
-        )
-
-    ofertas = cached_buscar_ofertas(rol, user["id"], termino, estado, tipo, modalidad)
+    # Eliminar el cache para asegurar que se vean los cambios inmediatamente
+    ofertas = _buscar_ofertas(
+        rol=rol,
+        user_id=user["id"],
+        termino=termino,
+        estado=estado,
+        tipo=tipo,
+        modalidad=modalidad,
+    )
 
     if not ofertas:
         st.info("No hay ofertas con los filtros seleccionados.")
@@ -383,17 +404,30 @@ def _mostrar_lista_gestion(user, rol):
 
         with st.expander("✏️ Editar oferta", expanded=False):
             with st.form(f"form_edit_{oferta_id}"):
-                titulo = st.text_input("Titulo", value=oferta.get("titulo") or "")
-                descripcion = st.text_area("Descripcion", value=oferta.get("descripcion") or "")
-                requisitos = st.text_area("Requisitos", value=oferta.get("requisitos") or "")
+                if rol == "egresado":
+                    titulo = st.text_input("Título del emprendimiento o servicio", value=oferta.get("titulo") or "")
+                    descripcion = st.text_area("Descripción detallada", value=oferta.get("descripcion") or "")
+                    requisitos = st.text_area("Habilidades / Experiencia requerida (Opcional)", value=oferta.get("requisitos") or "")
+                else:
+                    titulo = st.text_input("Titulo", value=oferta.get("titulo") or "")
+                    descripcion = st.text_area("Descripcion", value=oferta.get("descripcion") or "")
+                    requisitos = st.text_area("Requisitos", value=oferta.get("requisitos") or "")
 
                 ec1, ec2 = st.columns(2)
                 with ec1:
-                    tipo = st.selectbox(
-                        "Tipo",
-                        options=TIPOS_OFERTA,
-                        index=TIPOS_OFERTA.index(oferta.get("tipo")) if oferta.get("tipo") in TIPOS_OFERTA else 0,
-                    )
+                    if rol == "egresado":
+                        tipos_grad = ["servicio", "emprendimiento", "proyecto"]
+                        tipo = st.selectbox(
+                            "Tipo de oferta",
+                            options=tipos_grad,
+                            index=tipos_grad.index(oferta.get("tipo")) if oferta.get("tipo") in tipos_grad else 0,
+                        )
+                    else:
+                        tipo = st.selectbox(
+                            "Tipo",
+                            options=TIPOS_OFERTA,
+                            index=TIPOS_OFERTA.index(oferta.get("tipo")) if oferta.get("tipo") in TIPOS_OFERTA else 0,
+                        )
                     modalidad = st.selectbox(
                         "Modalidad",
                         options=MODALIDADES,
@@ -402,10 +436,14 @@ def _mostrar_lista_gestion(user, rol):
                     ubicacion = st.text_input("Ubicacion", value=oferta.get("ubicacion") or "")
 
                 with ec2:
-                    salario_min = st.number_input("Salario minimo", min_value=0, value=int(oferta.get("salario_min") or 0), step=100)
-                    salario_max = st.number_input("Salario maximo", min_value=0, value=int(oferta.get("salario_max") or 0), step=100)
+                    if rol == "egresado":
+                        salario_min = st.number_input("Precio/Salario base (S/)", min_value=0, value=int(oferta.get("salario_min") or 0), step=100)
+                        salario_max = st.number_input("Precio/Salario máximo (S/)", min_value=0, value=int(oferta.get("salario_max") or 0), step=100)
+                    else:
+                        salario_min = st.number_input("Salario minimo", min_value=0, value=int(oferta.get("salario_min") or 0), step=100)
+                        salario_max = st.number_input("Salario maximo", min_value=0, value=int(oferta.get("salario_max") or 0), step=100)
                     fecha_limite = st.date_input(
-                        "Fecha limite de postulacion",
+                        "Válido hasta",
                         value=pd.to_datetime(oferta.get("fecha_limite_postulacion")).date() if oferta.get("fecha_limite_postulacion") else date.today(),
                         min_value=date.today(),
                     )
@@ -413,30 +451,37 @@ def _mostrar_lista_gestion(user, rol):
                 carreras_actuales = oferta.get("carrera_objetivo") or []
                 if not isinstance(carreras_actuales, list):
                     carreras_actuales = []
-                carreras = st.multiselect("Carreras objetivo", options=CARRERAS_BASE, default=[c for c in carreras_actuales if c in CARRERAS_BASE])
+                carreras = st.multiselect("Carreras relacionadas", options=CARRERAS_BASE, default=[c for c in carreras_actuales if c in CARRERAS_BASE])
 
                 guardar = st.form_submit_button("💾 Guardar cambios", type="primary", use_container_width=True)
                 if guardar:
-                    ok, msg = _actualizar_oferta(
-                        oferta_id=oferta_id,
-                        user=user,
-                        rol=rol,
-                        titulo=titulo,
-                        descripcion=descripcion,
-                        requisitos=requisitos,
-                        tipo=tipo,
-                        modalidad=modalidad,
-                        ubicacion=ubicacion,
-                        salario_min=salario_min,
-                        salario_max=salario_max,
-                        fecha_limite=fecha_limite,
-                        carreras=carreras,
-                    )
-                    if ok:
-                        add_notification(msg, "success")
+                    success_edit = False
+                    try:
+                        ok, msg = _actualizar_oferta(
+                            oferta_id=oferta_id,
+                            user=user,
+                            rol=rol,
+                            titulo=titulo,
+                            descripcion=descripcion,
+                            requisitos=requisitos,
+                            tipo=tipo,
+                            modalidad=modalidad,
+                            ubicacion=ubicacion,
+                            salario_min=salario_min,
+                            salario_max=salario_max,
+                            fecha_limite=fecha_limite,
+                            carreras=carreras,
+                        )
+                        if ok:
+                            add_notification(msg, "success")
+                            success_edit = True
+                        else:
+                            st.error(msg)
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+                    
+                    if success_edit:
                         st.rerun()
-                    else:
-                        st.error(msg)
 
 
 def _toggle_estado_oferta(oferta_id, user, rol):
@@ -444,25 +489,36 @@ def _toggle_estado_oferta(oferta_id, user, rol):
         st.error("No tienes permisos para gestionar esta oferta.")
         return
 
+    success = False
     try:
         with get_db_cursor(commit=True) as cur:
             cur.execute("UPDATE ofertas SET activa = NOT activa WHERE id = %s", (oferta_id,))
         add_notification("Estado de la oferta actualizado.", "success")
-        st.rerun()
+        success = True
     except Exception as exc:
         st.error(f"Error al actualizar estado: {exc}")
+    
+    if success:
+        st.rerun()
 
 
 def _mostrar_formulario_crear(user, rol):
-    st.subheader("Nueva oferta laboral")
+    st.subheader("Publicar Nueva Oferta")
 
     empresa_id = None
+    egresado_id = None
+
     if rol == "empleador":
         _, empresa_id = _obtener_empleador(user["id"])
         if not empresa_id:
             st.error("No tienes una empresa asociada.")
             return
-    else:
+    elif rol == "egresado":
+        egresado_id = _obtener_id_egresado(user["id"])
+        if not egresado_id:
+            st.error("No se encontró tu perfil de egresado.")
+            return
+    else: # administrador
         empresas = _obtener_empresas_activas()
         if not empresas:
             st.warning("No hay empresas activas para publicar ofertas.")
@@ -474,46 +530,71 @@ def _mostrar_formulario_crear(user, rol):
         )
 
     with st.form("form_nueva_oferta"):
-        titulo = st.text_input("Titulo de la posicion")
-        descripcion = st.text_area("Descripcion del puesto")
-        requisitos = st.text_area("Requisitos")
+        if rol == "egresado":
+            st.info("💡 Como egresado, puedes publicar tus emprendimientos, servicios o disponibilidad para proyectos.")
+            titulo = st.text_input("Título del emprendimiento o servicio (Ej: Consultoría en Sistemas)")
+            descripcion = st.text_area("Descripción detallada de lo que ofreces")
+            requisitos = st.text_area("Habilidades / Experiencia requerida (Opcional)")
+        else:
+            titulo = st.text_input("Título de la posición")
+            descripcion = st.text_area("Descripción del puesto")
+            requisitos = st.text_area("Requisitos")
 
         c1, c2 = st.columns(2)
         with c1:
-            tipo = st.selectbox("Tipo", options=TIPOS_OFERTA)
+            if rol == "egresado":
+                tipos_grad = ["servicio", "emprendimiento", "proyecto"]
+                tipo = st.selectbox("Tipo de oferta", options=tipos_grad)
+            else:
+                tipo = st.selectbox("Tipo", options=TIPOS_OFERTA)
             modalidad = st.selectbox("Modalidad", options=MODALIDADES)
-            ubicacion = st.text_input("Ubicacion")
+            ubicacion = st.text_input("Ubicación")
         with c2:
-            salario_min = st.number_input("Salario minimo (S/)", min_value=0, value=0, step=100)
-            salario_max = st.number_input("Salario maximo (S/)", min_value=0, value=0, step=100)
-            fecha_limite = st.date_input("Fecha limite de postulacion", value=date.today())
+            if rol == "egresado":
+                salario_min = st.number_input("Precio/Salario base (S/)", min_value=0, value=0, step=100)
+                salario_max = st.number_input("Precio/Salario máximo (S/)", min_value=0, value=0, step=100)
+            else:
+                salario_min = st.number_input("Salario mínimo (S/)", min_value=0, value=0, step=100)
+                salario_max = st.number_input("Salario máximo (S/)", min_value=0, value=0, step=100)
+            fecha_limite = st.date_input("Válido hasta", value=date.today())
 
-        carreras = st.multiselect("Carreras objetivo", options=CARRERAS_BASE)
+        carreras = st.multiselect("Carreras relacionadas", options=CARRERAS_BASE)
 
         submitted = st.form_submit_button("Publicar oferta", type="primary", use_container_width=True)
         if submitted:
-            ok, msg = _crear_oferta(
-                empresa_id=empresa_id,
-                titulo=titulo,
-                descripcion=descripcion,
-                requisitos=requisitos,
-                tipo=tipo,
-                modalidad=modalidad,
-                ubicacion=ubicacion,
-                salario_min=salario_min,
-                salario_max=salario_max,
-                fecha_limite=fecha_limite,
-                carreras=carreras,
-            )
-            if ok:
-                add_notification(msg, "success")
+            success_crear = False
+            try:
+                ok, msg = _crear_oferta(
+                    empresa_id=empresa_id,
+                    publicado_por=user["id"],
+                    egresado_id=egresado_id,
+                    titulo=titulo,
+                    descripcion=descripcion,
+                    requisitos=requisitos,
+                    tipo=tipo,
+                    modalidad=modalidad,
+                    ubicacion=ubicacion,
+                    salario_min=salario_min,
+                    salario_max=salario_max,
+                    fecha_limite=fecha_limite,
+                    carreras=carreras,
+                )
+                if ok:
+                    add_notification(msg, "success")
+                    success_crear = True
+                else:
+                    st.error(msg)
+            except Exception as e:
+                st.error(f"Error: {e}")
+            
+            if success_crear:
                 st.rerun()
-            else:
-                st.error(msg)
 
 
 def _crear_oferta(
     empresa_id,
+    publicado_por,
+    egresado_id,
     titulo,
     descripcion,
     requisitos,
@@ -535,6 +616,8 @@ def _crear_oferta(
                 """
                 INSERT INTO ofertas (
                     empresa_id,
+                    publicado_por,
+                    egresado_propietario_id,
                     titulo,
                     descripcion,
                     requisitos,
@@ -547,10 +630,12 @@ def _crear_oferta(
                     carrera_objetivo,
                     activa
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, TRUE)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, TRUE)
                 """,
                 (
                     empresa_id,
+                    publicado_por,
+                    egresado_id,
                     titulo.strip(),
                     descripcion.strip(),
                     (requisitos or "").strip() or None,

@@ -31,6 +31,8 @@ st.set_page_config(
     initial_sidebar_state="auto"
 )
 
+from src.utils.database import init_critical_tables
+init_critical_tables()
 init_session_state()
 render_notifications()
 
@@ -139,6 +141,7 @@ else:
                 "🏠 Mi Dashboard": "dashboard",
                 "👤 Mi Perfil": "egresados_mi_perfil",
                 "💼 Buscar Ofertas": "ofertas_buscar",
+                "📢 Mis Ofertas (Emprendedor)": "ofertas_gestionar",
                 "📋 Mis Postulaciones": "postulaciones_seguimiento",
                 "📅 Eventos": "eventos_calendario",
                 "📄 Mis Pagos": "pagos_mis_vouchers",

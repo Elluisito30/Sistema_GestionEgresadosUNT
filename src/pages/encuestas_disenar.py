@@ -9,13 +9,16 @@ import pandas as pd
 import streamlit as st
 
 from src.utils.database import get_db_cursor
-from src.utils.session import add_notification
+from src.utils.session import add_notification, render_notifications
 from src.utils.pdf_generator import generar_pdf_reporte_generico
+
+CATEGORIAS = ["General", "Laboral", "Académica", "Satisfacción", "Personal"]
 
 def show():
     """Muestra la página de diseño de encuestas."""
     
     st.title("📝 Diseño de Encuestas")
+    render_notifications()
     
     user = st.session_state.user
     
@@ -23,32 +26,82 @@ def show():
         st.error("Acceso restringido a administradores")
         return
     
-    # Tabs
-    tab1, tab2, tab3 = st.tabs([
-        "➕ Nueva Encuesta",
-        "📋 Encuestas Activas",
-        "📊 Resultados"
-    ])
+    # Definir opciones de navegación
+    opciones_tabs = ["➕ Nueva", "✏️ Editar", "📋 Gestión", "📊 Análisis"]
     
-    with tab1:
+    # Inicializar el estado de la pestaña si no existe
+    if 'tab_activa_encuestas' not in st.session_state:
+        st.session_state.tab_activa_encuestas = "📋 Gestión"
+
+    # Selector de pestañas: Usamos st.radio pero sincronizado con el estado manual
+    tab_seleccionada = st.radio(
+        "Seleccionar sección:",
+        options=opciones_tabs,
+        index=opciones_tabs.index(st.session_state.tab_activa_encuestas),
+        horizontal=True,
+        key="nav_encuestas_selector" # Cambiamos la clave para evitar conflictos de persistencia
+    )
+    
+    # Si el usuario cambia manualmente la pestaña en el radio, actualizamos el estado maestro
+    if tab_seleccionada != st.session_state.tab_activa_encuestas:
+        st.session_state.tab_activa_encuestas = tab_seleccionada
+        st.rerun()
+
+    st.markdown("---")
+
+    # Renderizar contenido basado en el estado maestro
+    if st.session_state.tab_activa_encuestas == "➕ Nueva":
+        # Si venimos de la pestaña Editar, limpiar el estado
+        if 'editando_encuesta_id' in st.session_state:
+            del st.session_state.editando_encuesta_id
+            if 'nueva_encuesta' in st.session_state:
+                del st.session_state.nueva_encuesta
         crear_encuesta(user['id'])
     
-    with tab2:
-        gestionar_encuestas()
+    elif st.session_state.tab_activa_encuestas == "✏️ Editar":
+        if st.session_state.get('editando_encuesta_id'):
+            crear_encuesta(user['id'])
+        else:
+            st.info("Seleccione una encuesta en la pestaña '📋 Gestión' para editarla.")
+            if st.button("Ir a Gestión"):
+                st.session_state.tab_activa_encuestas = "📋 Gestión"
+                st.rerun()
     
-    with tab3:
+    elif st.session_state.tab_activa_encuestas == "📋 Gestión":
+        if st.session_state.get('ver_detalle_id'):
+            if st.button("⬅️ Volver al listado"):
+                del st.session_state.ver_detalle_id
+                st.rerun()
+            ver_encuesta_detalle(st.session_state.ver_detalle_id)
+        else:
+            gestionar_encuestas()
+    
+    elif st.session_state.tab_activa_encuestas == "📊 Análisis":
         ver_resultados_encuestas()
 
 def crear_encuesta(admin_id):
-    """Formulario para crear una nueva encuesta."""
+    """Formulario para crear o editar una encuesta."""
     
-    st.subheader("Crear Nueva Encuesta de Seguimiento")
+    editando_id = st.session_state.get('editando_encuesta_id')
+    if editando_id:
+        st.subheader(f"Editar Encuesta #{editando_id}")
+        if st.button("➕ Ir a Crear Nueva Encuesta"):
+            del st.session_state.nueva_encuesta
+            del st.session_state.editando_encuesta_id
+            st.session_state.tab_activa_encuestas = "➕ Nueva"
+            st.rerun()
+    else:
+        st.subheader("Crear Nueva Encuesta de Seguimiento")
     
     # Inicializar estado para la nueva encuesta
     if 'nueva_encuesta' not in st.session_state:
         st.session_state.nueva_encuesta = {
             'titulo': '',
             'descripcion': '',
+            'categoria': 'General',
+            'es_obligatoria': False,
+            'dirigida_a': 'todos', # 'todos', 'especificos'
+            'egresados_asignados': [],
             'fecha_inicio': date.today(),
             'fecha_fin': date.today() + timedelta(days=30),
             'preguntas': []
@@ -59,31 +112,99 @@ def crear_encuesta(admin_id):
     
     # Formulario principal
     with st.form("form_encuesta"):
-        titulo = st.text_input("Título de la Encuesta *", 
-                               value=st.session_state.nueva_encuesta['titulo'])
+        col_t1, col_t2 = st.columns([3, 1])
+        with col_t1:
+            titulo = st.text_input("Título de la Encuesta *", 
+                                   value=st.session_state.nueva_encuesta['titulo'])
+        with col_t2:
+            categoria = st.selectbox("Categoría", options=CATEGORIAS, 
+                                     index=CATEGORIAS.index(st.session_state.nueva_encuesta['categoria']))
+            
         descripcion = st.text_area("Descripción", 
                                   value=st.session_state.nueva_encuesta['descripcion'],
-                                  height=100)
+                                  height=80)
         
-        col1, col2 = st.columns(2)
-        with col1:
+        c1, c2, c3 = st.columns([1, 1, 1])
+        with c1:
             fecha_inicio = st.date_input("Fecha de Inicio *", 
                                         value=st.session_state.nueva_encuesta['fecha_inicio'])
-        with col2:
+        with c2:
             fecha_fin = st.date_input("Fecha de Fin *", 
                                      value=st.session_state.nueva_encuesta['fecha_fin'],
                                      min_value=fecha_inicio)
+        with c3:
+            st.write("") # Spacer
+            es_obligatoria = st.checkbox("Encuesta obligatoria", 
+                                         value=st.session_state.nueva_encuesta['es_obligatoria'])
         
-        submitted = st.form_submit_button("Guardar Información Básica")
+        st.markdown("---")
+        st.markdown("**Destinatarios**")
+        col_d1, col_d2 = st.columns([1, 2])
+        with col_d1:
+            dirigida_a = st.radio("Dirigida a:", options=['todos', 'especificos'], 
+                                   index=['todos', 'especificos'].index(st.session_state.nueva_encuesta['dirigida_a']),
+                                   format_func=lambda x: "Todos los egresados" if x == 'todos' else "Egresados específicos")
+        
+        egresados_ids = []
+        if dirigida_a == 'especificos':
+            with col_d2:
+                # Obtener lista de egresados
+                with get_db_cursor() as cur:
+                    cur.execute("SELECT id, nombres, apellido_paterno, dni FROM egresados ORDER BY apellido_paterno")
+                    egresados_lista = cur.fetchall()
+                
+                opciones_egresados = {f"{r[2]}, {r[1]} (DNI: {r[3]})": r[0] for r in egresados_lista}
+                egresados_ids = st.multiselect("Seleccionar egresados:", 
+                                               options=list(opciones_egresados.keys()),
+                                               default=[k for k, v in opciones_egresados.items() if v in st.session_state.nueva_encuesta['egresados_asignados']])
+                egresados_ids = [opciones_egresados[k] for k in egresados_ids]
+
+        submitted = st.form_submit_button("Guardar Configuración General", use_container_width=True)
         
         if submitted:
             st.session_state.nueva_encuesta.update({
                 'titulo': titulo,
                 'descripcion': descripcion,
+                'categoria': categoria,
+                'es_obligatoria': es_obligatoria,
+                'dirigida_a': dirigida_a,
+                'egresados_asignados': egresados_ids,
                 'fecha_inicio': fecha_inicio,
                 'fecha_fin': fecha_fin
             })
-            add_notification("Información guardada", "success")
+            add_notification("Configuración general guardada", "success")
+            st.rerun()
+    
+    st.markdown("---")
+    
+    # Plantillas rápidas
+    with st.expander("💡 Usar Plantilla Rápida"):
+        col_p1, col_p2, col_p3 = st.columns(3)
+        if col_p1.button("💼 Seguimiento Laboral", use_container_width=True):
+            st.session_state.nueva_encuesta['titulo'] = "Seguimiento de Situación Laboral"
+            st.session_state.nueva_encuesta['categoria'] = "Laboral"
+            st.session_state.nueva_encuesta['preguntas'] = [
+                {'texto': '¿Se encuentra trabajando actualmente?', 'tipo': 'opcion_multiple', 'opciones': ['Sí', 'No']},
+                {'texto': '¿Su trabajo está relacionado con su carrera?', 'tipo': 'opcion_multiple', 'opciones': ['Totalmente', 'Parcialmente', 'Nada']},
+                {'texto': '¿Cuál es su rango salarial aproximado?', 'tipo': 'opcion_multiple', 'opciones': ['Menos de S/ 1500', 'S/ 1500 - S/ 3000', 'S/ 3000 - S/ 5000', 'Más de S/ 5000']}
+            ]
+            st.rerun()
+        if col_p2.button("🎓 Calidad Académica", use_container_width=True):
+            st.session_state.nueva_encuesta['titulo'] = "Evaluación de Formación Académica"
+            st.session_state.nueva_encuesta['categoria'] = "Académica"
+            st.session_state.nueva_encuesta['preguntas'] = [
+                {'texto': '¿Cómo califica la formación recibida en la UNT?', 'tipo': 'escala', 'opciones': []},
+                {'texto': '¿Qué competencias considera que faltaron en su formación?', 'tipo': 'texto', 'opciones': []}
+            ]
+            st.rerun()
+        if col_p3.button("✨ Satisfacción Egresado", use_container_width=True):
+            st.session_state.nueva_encuesta['titulo'] = "Satisfacción del Egresado"
+            st.session_state.nueva_encuesta['categoria'] = "Satisfacción"
+            st.session_state.nueva_encuesta['preguntas'] = [
+                {'texto': '¿Recomendaría su carrera a otros estudiantes?', 'tipo': 'opcion_multiple', 'opciones': ['Sí', 'No', 'Tal vez']},
+                {'texto': 'Sugerencias para mejorar el vínculo Universidad-Egresado', 'tipo': 'texto', 'opciones': []}
+            ]
+            st.rerun()
     
     st.markdown("---")
     
@@ -117,7 +238,7 @@ def crear_encuesta(admin_id):
             st.markdown(f"**Pregunta {idx + 1}**")
             
             texto = st.text_input("Texto de la pregunta *", value=pregunta['texto'],
-                                 key=f"texto_{idx}")
+                                 key=f"q_txt_{idx}")
             
             tipo = st.selectbox(
                 "Tipo de respuesta",
@@ -128,7 +249,7 @@ def crear_encuesta(admin_id):
                     'escala': 'Escala numérica (1-10)'
                 }[x],
                 index=['texto', 'opcion_multiple', 'escala'].index(pregunta['tipo']),
-                key=f"tipo_{idx}"
+                key=f"q_tipo_{idx}"
             )
             
             if tipo == 'opcion_multiple':
@@ -136,7 +257,7 @@ def crear_encuesta(admin_id):
                 opciones_text = st.text_area(
                     "Ingrese las opciones",
                     value='\n'.join(pregunta['opciones']),
-                    key=f"opciones_{idx}"
+                    key=f"q_ops_{idx}"
                 )
                 opciones = [o.strip() for o in opciones_text.split('\n') if o.strip()]
             else:
@@ -144,7 +265,7 @@ def crear_encuesta(admin_id):
             
             col_a, col_b = st.columns(2)
             with col_a:
-                if st.button("💾 Guardar Pregunta", key=f"guardar_{idx}"):
+                if st.button("💾 Guardar Pregunta", key=f"q_save_{idx}"):
                     st.session_state.nueva_encuesta['preguntas'][idx] = {
                         'texto': texto,
                         'tipo': tipo,
@@ -154,7 +275,7 @@ def crear_encuesta(admin_id):
                     st.rerun()
             
             with col_b:
-                if st.button("❌ Cancelar", key=f"cancel_{idx}"):
+                if st.button("❌ Cancelar", key=f"q_cancel_{idx}"):
                     if idx >= len(st.session_state.nueva_encuesta['preguntas']) or \
                        not st.session_state.nueva_encuesta['preguntas'][idx]['texto']:
                         # Si es nueva y vacía, eliminar
@@ -181,12 +302,12 @@ def crear_encuesta(admin_id):
                         st.caption(f"Opciones: {', '.join(pregunta['opciones'])}")
                 
                 with col_b:
-                    if st.button("✏️ Editar", key=f"edit_{i}"):
+                    if st.button("✏️ Editar", key=f"q_edit_{i}"):
                         st.session_state.editando_pregunta = i
                         st.rerun()
                 
                 with col_c:
-                    if st.button("🗑️ Eliminar", key=f"del_{i}"):
+                    if st.button("🗑️ Eliminar", key=f"q_del_{i}"):
                         st.session_state.nueva_encuesta['preguntas'].pop(i)
                         if st.session_state.editando_pregunta > i:
                             st.session_state.editando_pregunta -= 1
@@ -195,13 +316,14 @@ def crear_encuesta(admin_id):
     st.markdown("---")
     
     # Botón final para guardar encuesta
-    if st.button("💾 GUARDAR ENCUESTA COMPLETA", type="primary", use_container_width=True):
+    if st.button("💾 GUARDAR CAMBIOS" if st.session_state.get('editando_encuesta_id') else "💾 GUARDAR ENCUESTA COMPLETA", type="primary", use_container_width=True):
         guardar_encuesta_completa(admin_id)
 
 def guardar_encuesta_completa(admin_id):
-    """Guarda la encuesta completa en la base de datos."""
+    """Guarda o actualiza la encuesta completa en la base de datos."""
     
     encuesta = st.session_state.nueva_encuesta
+    editando_id = st.session_state.get('editando_encuesta_id')
     
     # Validaciones
     if not encuesta['titulo']:
@@ -212,6 +334,10 @@ def guardar_encuesta_completa(admin_id):
         add_notification("Debe agregar al menos una pregunta", "error")
         return
     
+    if encuesta['dirigida_a'] == 'especificos' and not encuesta['egresados_asignados']:
+        add_notification("Debe seleccionar al menos un egresado para esta encuesta", "error")
+        return
+
     for i, p in enumerate(encuesta['preguntas']):
         if not p['texto']:
             add_notification(f"La pregunta {i+1} no tiene texto", "error")
@@ -220,24 +346,61 @@ def guardar_encuesta_completa(admin_id):
             add_notification(f"La pregunta {i+1} debe tener al menos 2 opciones", "error")
             return
     
+    success = False
     try:
         with get_db_cursor(commit=True) as cur:
-            # Insertar encuesta
-            cur.execute("""
-                INSERT INTO encuestas (titulo, descripcion, fecha_inicio, fecha_fin, creada_por)
-                VALUES (%s, %s, %s, %s, %s)
-                RETURNING id
-            """, (
-                encuesta['titulo'],
-                encuesta['descripcion'],
-                encuesta['fecha_inicio'],
-                encuesta['fecha_fin'],
-                admin_id
-            ))
+            if editando_id:
+                # Actualizar encuesta
+                cur.execute("""
+                    UPDATE encuestas 
+                    SET titulo = %s, descripcion = %s, categoria = %s, es_obligatoria = %s, 
+                        dirigida_a = %s, fecha_inicio = %s, fecha_fin = %s
+                    WHERE id = %s
+                """, (
+                    encuesta['titulo'],
+                    encuesta['descripcion'],
+                    encuesta['categoria'],
+                    encuesta['es_obligatoria'],
+                    encuesta['dirigida_a'],
+                    encuesta['fecha_inicio'],
+                    encuesta['fecha_fin'],
+                    editando_id
+                ))
+                
+                encuesta_id = editando_id
+                
+                # Limpiar asignaciones y preguntas previas para reinsertar
+                cur.execute("DELETE FROM asignaciones_encuesta WHERE encuesta_id = %s", (encuesta_id,))
+                cur.execute("DELETE FROM preguntas_encuesta WHERE encuesta_id = %s", (encuesta_id,))
+                
+            else:
+                # Insertar nueva encuesta
+                cur.execute("""
+                    INSERT INTO encuestas (titulo, descripcion, categoria, es_obligatoria, dirigida_a, fecha_inicio, fecha_fin, creada_por)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id
+                """, (
+                    encuesta['titulo'],
+                    encuesta['descripcion'],
+                    encuesta['categoria'],
+                    encuesta['es_obligatoria'],
+                    encuesta['dirigida_a'],
+                    encuesta['fecha_inicio'],
+                    encuesta['fecha_fin'],
+                    admin_id
+                ))
+                
+                encuesta_id = cur.fetchone()[0]
+
+            # Re-Insertar asignaciones si es específica
+            if encuesta['dirigida_a'] == 'especificos':
+                for eg_id in encuesta['egresados_asignados']:
+                    cur.execute("""
+                        INSERT INTO asignaciones_encuesta (encuesta_id, egresado_id)
+                        VALUES (%s, %s)
+                    """, (encuesta_id, eg_id))
             
-            encuesta_id = cur.fetchone()[0]
-            
-            # Insertar preguntas
+            # Re-Insertar preguntas
             for pregunta in encuesta['preguntas']:
                 cur.execute("""
                     INSERT INTO preguntas_encuesta (encuesta_id, texto_pregunta, tipo_respuesta, opciones)
@@ -249,35 +412,132 @@ def guardar_encuesta_completa(admin_id):
                     json.dumps(pregunta['opciones']) if pregunta['opciones'] else None
                 ))
             
-            add_notification(f"Encuesta creada exitosamente con ID: {encuesta_id}", "success")
-            
-            # Limpiar estado
-            del st.session_state.nueva_encuesta
-            st.rerun()
+            msg = f"Encuesta actualizada exitosamente" if editando_id else f"Encuesta creada exitosamente con ID: {encuesta_id}"
+            add_notification(msg, "success")
+            success = True
             
     except Exception as e:
         add_notification(f"Error al guardar encuesta: {str(e)}", "error")
 
+    if success:
+        # Limpiar estado
+        if 'nueva_encuesta' in st.session_state:
+            del st.session_state.nueva_encuesta
+        if 'editando_encuesta_id' in st.session_state:
+            del st.session_state.editando_encuesta_id
+        
+        # Redirigir a gestión tras guardar
+        st.session_state.tab_activa_encuestas = "📋 Gestión"
+        st.rerun()
+
+def cargar_datos_encuesta(encuesta_id):
+    """Carga los datos de una encuesta existente en el estado de sesión para editar."""
+    try:
+        with get_db_cursor() as cur:
+            # Obtener datos generales de la encuesta
+            cur.execute("""
+                SELECT titulo, descripcion, categoria, es_obligatoria, dirigida_a, fecha_inicio, fecha_fin
+                FROM encuestas WHERE id = %s
+            """, (encuesta_id,))
+            row = cur.fetchone()
+            if not row:
+                add_notification("No se encontró la encuesta", "error")
+                return False
+
+            titulo, descripcion, categoria, es_obligatoria, dirigida_a, fecha_inicio, fecha_fin = row
+
+            # Obtener asignaciones si es específica
+            egresados_asignados = []
+            if dirigida_a == 'especificos':
+                cur.execute("SELECT egresado_id FROM asignaciones_encuesta WHERE encuesta_id = %s", (encuesta_id,))
+                egresados_asignados = [r[0] for r in cur.fetchall()]
+
+            # Obtener preguntas
+            cur.execute("""
+                SELECT texto_pregunta, tipo_respuesta, opciones
+                FROM preguntas_encuesta WHERE encuesta_id = %s ORDER BY id
+            """, (encuesta_id,))
+            preguntas = []
+            for texto, tipo, opciones in cur.fetchall():
+                # Manejo robusto de JSON (puede venir como string o como objeto dependiendo del driver)
+                opciones_lista = []
+                if opciones:
+                    if isinstance(opciones, (list, dict)):
+                        opciones_lista = opciones
+                    else:
+                        try:
+                            opciones_lista = json.loads(opciones)
+                        except:
+                            opciones_lista = []
+                
+                preguntas.append({
+                    'texto': texto,
+                    'tipo': tipo,
+                    'opciones': opciones_lista
+                })
+
+            # Guardar en session_state
+            st.session_state.nueva_encuesta = {
+                'titulo': titulo,
+                'descripcion': descripcion or '',
+                'categoria': categoria or 'General',
+                'es_obligatoria': bool(es_obligatoria),
+                'dirigida_a': dirigida_a or 'todos',
+                'egresados_asignados': egresados_asignados,
+                'fecha_inicio': fecha_inicio,
+                'fecha_fin': fecha_fin,
+                'preguntas': preguntas
+            }
+            st.session_state.editando_encuesta_id = encuesta_id
+            return True
+            
+    except Exception as e:
+        add_notification(f"Error al cargar encuesta: {str(e)}", "error")
+        return False
+
 def gestionar_encuestas():
     """Muestra y permite gestionar encuestas existentes."""
     
-    st.subheader("Encuestas Activas")
+    st.subheader("Panel de Gestión de Encuestas")
     
+    # Verificar si las nuevas columnas existen
+    cols_exist = {'categoria': False, 'es_obligatoria': False}
+    try:
+        with get_db_cursor() as cur:
+            cur.execute("""
+                SELECT column_name FROM information_schema.columns 
+                WHERE table_name='encuestas' AND column_name IN ('categoria', 'es_obligatoria')
+            """)
+            found = [r[0] for r in cur.fetchall()]
+            for c in cols_exist:
+                if c in found:
+                    cols_exist[c] = True
+    except:
+        pass
+
     with get_db_cursor() as cur:
-        cur.execute("""
+        query_cols = "e.id, e.titulo, e.descripcion, e.fecha_inicio, e.fecha_fin, e.activa"
+        if cols_exist['categoria']:
+            query_cols += ", e.categoria"
+        else:
+            query_cols += ", 'General' as categoria"
+            
+        if cols_exist['es_obligatoria']:
+            query_cols += ", e.es_obligatoria"
+        else:
+            query_cols += ", FALSE as es_obligatoria"
+
+        cur.execute(f"""
             SELECT 
-                e.id,
-                e.titulo,
-                e.descripcion,
-                e.fecha_inicio,
-                e.fecha_fin,
-                e.activa,
+                {query_cols},
                 COUNT(DISTINCT p.id) as total_preguntas,
                 COUNT(DISTINCT r.egresado_id) as total_respuestas
             FROM encuestas e
             LEFT JOIN preguntas_encuesta p ON e.id = p.encuesta_id
             LEFT JOIN respuestas_encuesta r ON e.id = r.encuesta_id
-            GROUP BY e.id
+            GROUP BY e.id, e.titulo, e.descripcion, e.fecha_inicio, e.fecha_fin, e.activa
+            {", e.categoria" if cols_exist['categoria'] else ""}
+            {", e.es_obligatoria" if cols_exist['es_obligatoria'] else ""}
             ORDER BY e.fecha_inicio DESC
         """)
         
@@ -293,66 +553,144 @@ def gestionar_encuestas():
                 
                 with col1:
                     estado = "🟢 Activa" if encuesta[5] else "🔴 Inactiva"
-                    st.markdown(f"### {encuesta[1]} - {estado}")
+                    obligatoria = " (Obligatoria)" if encuesta[7] else ""
+                    st.markdown(f"### {encuesta[1]} {obligatoria}")
+                    st.caption(f"Categoría: {encuesta[6]} | {estado}")
                     st.markdown(encuesta[2] or "")
                     st.markdown(f"📅 **Período:** {encuesta[3]} al {encuesta[4]}")
-                    st.markdown(f"📊 **Preguntas:** {encuesta[6]} | **Respuestas:** {encuesta[7]}")
+                    st.markdown(f"📊 **Preguntas:** {encuesta[8]} | **Respuestas:** {encuesta[9]}")
                 
                 with col2:
-                    if st.button("📋 Ver", key=f"view_{encuesta[0]}"):
-                        ver_encuesta_detalle(encuesta[0])
+                    if st.button("📋 Ver Detalle", key=f"srv_view_{encuesta[0]}", use_container_width=True):
+                        st.session_state.ver_detalle_id = encuesta[0]
+                        st.rerun()
                     
-                    if st.button("📊 Resultados", key=f"res_{encuesta[0]}"):
+                    if st.button("✏️ Editar", key=f"srv_edit_{encuesta[0]}", use_container_width=True):
+                        if cargar_datos_encuesta(encuesta[0]):
+                            st.session_state.tab_activa_encuestas = "✏️ Editar"
+                            st.rerun()
+                    
+                    if st.button("📊 Ver Análisis", key=f"srv_res_{encuesta[0]}", use_container_width=True):
                         st.session_state.encuesta_resultado = encuesta[0]
+                        st.session_state.tab_activa_encuestas = "📊 Análisis"
                         st.rerun()
                 
                 with col3:
                     if encuesta[5]:  # activa
-                        if st.button("🔴 Desactivar", key=f"des_{encuesta[0]}"):
+                        if st.button("🔴 Desactivar", key=f"srv_des_{encuesta[0]}", use_container_width=True):
                             cambiar_estado_encuesta(encuesta[0], False)
                     else:
-                        if st.button("🟢 Activar", key=f"act_{encuesta[0]}"):
+                        if st.button("🟢 Activar", key=f"srv_act_{encuesta[0]}", use_container_width=True):
                             cambiar_estado_encuesta(encuesta[0], True)
                     
-                    if st.button("🗑️ Eliminar", key=f"del_{encuesta[0]}"):
-                        eliminar_encuesta(encuesta[0])
+                    if st.button("🗑️ Eliminar", key=f"srv_del_{encuesta[0]}", type="secondary", use_container_width=True):
+                        st.session_state.encuesta_a_eliminar = encuesta[0]
+                        st.rerun()
+
+    # Mostrar modal de eliminación fuera del bucle para evitar problemas de anidamiento de botones en Streamlit
+    if st.session_state.get('encuesta_a_eliminar'):
+        st.markdown("---")
+        eliminar_encuesta(st.session_state.encuesta_a_eliminar)
+        if st.button("🚫 Cancelar eliminación", key="cancel_global_del"):
+             eid = st.session_state.get('encuesta_a_eliminar')
+             if eid:
+                 if f'confirm_del_{eid}' in st.session_state:
+                     del st.session_state[f'confirm_del_{eid}']
+                 if f'confirm_clear_{eid}' in st.session_state:
+                     del st.session_state[f'confirm_clear_{eid}']
+             del st.session_state.encuesta_a_eliminar
+             st.rerun()
 
 def cambiar_estado_encuesta(encuesta_id, activo):
     """Activa o desactiva una encuesta."""
     
+    success = False
     try:
         with get_db_cursor(commit=True) as cur:
             cur.execute("UPDATE encuestas SET activa = %s WHERE id = %s", (activo, encuesta_id))
             
             estado = "activada" if activo else "desactivada"
             add_notification(f"Encuesta {estado} exitosamente", "success")
-            st.rerun()
+            success = True
             
     except Exception as e:
         add_notification(f"Error al cambiar estado: {str(e)}", "error")
 
+    if success:
+        st.rerun()
+
 def eliminar_encuesta(encuesta_id):
-    """Elimina una encuesta (solo si no tiene respuestas)."""
+    """Elimina físicamente una encuesta, pero solo si no tiene respuestas o si se han limpiado previamente."""
     
+    # Verificar si tiene respuestas antes de mostrar cualquier botón de borrado
+    with get_db_cursor() as cur:
+        cur.execute("SELECT COUNT(*) FROM respuestas_encuesta WHERE encuesta_id = %s", (encuesta_id,))
+        total_respuestas = cur.fetchone()[0]
+
+    if total_respuestas > 0:
+        st.warning(f"⚠️ Esta encuesta tiene {total_respuestas} respuestas. No se puede eliminar por seguridad.")
+        
+        # Opción para limpiar respuestas primero
+        if f"confirm_clear_{encuesta_id}" not in st.session_state:
+            st.session_state[f"confirm_clear_{encuesta_id}"] = False
+            
+        if not st.session_state[f"confirm_clear_{encuesta_id}"]:
+            if st.button(f"🗑️ Limpiar todas las respuestas (#{encuesta_id})", key=f"btn_clear_{encuesta_id}", use_container_width=True):
+                st.session_state[f"confirm_clear_{encuesta_id}"] = True
+                st.rerun()
+        else:
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("🔥 CONFIRMAR LIMPIEZA", key=f"btn_clear_final_{encuesta_id}", type="primary", use_container_width=True):
+                    success_clear = False
+                    try:
+                        with get_db_cursor(commit=True) as cur:
+                            cur.execute("DELETE FROM respuestas_encuesta WHERE encuesta_id = %s", (encuesta_id,))
+                        add_notification("Respuestas eliminadas. Ahora puede eliminar la encuesta.", "success")
+                        success_clear = True
+                    except Exception as e:
+                        st.error(f"Error al limpiar: {e}")
+                    
+                    if success_clear:
+                        del st.session_state[f"confirm_clear_{encuesta_id}"]
+                        st.rerun()
+            with col2:
+                if st.button("❌ Cancelar", key=f"btn_clear_cancel_{encuesta_id}", use_container_width=True):
+                    del st.session_state[f"confirm_clear_{encuesta_id}"]
+                    st.rerun()
+        return
+
+    # Si no tiene respuestas, permitir eliminación física de la encuesta
+    if f"confirm_del_{encuesta_id}" not in st.session_state:
+        st.session_state[f"confirm_del_{encuesta_id}"] = False
+
+    if not st.session_state[f"confirm_del_{encuesta_id}"]:
+        if st.button(f"🚨 ELIMINAR ENCUESTA #{encuesta_id}", key=f"btn_confirm_{encuesta_id}", type="primary", use_container_width=True):
+            st.session_state[f"confirm_del_{encuesta_id}"] = True
+            st.rerun()
+        return
+
+    success_del = False
     try:
         with get_db_cursor(commit=True) as cur:
-            # Verificar si tiene respuestas
-            cur.execute("SELECT COUNT(*) FROM respuestas_encuesta WHERE encuesta_id = %s", (encuesta_id,))
-            if cur.fetchone()[0] > 0:
-                add_notification("No se puede eliminar una encuesta con respuestas", "error")
-                return
-            
-            # Eliminar preguntas primero (por FK)
+            # Borrar preguntas (aunque el CASCADE lo haría, lo hacemos explícito para seguridad)
             cur.execute("DELETE FROM preguntas_encuesta WHERE encuesta_id = %s", (encuesta_id,))
-            
-            # Eliminar encuesta
+            # Borrar encuesta
             cur.execute("DELETE FROM encuestas WHERE id = %s", (encuesta_id,))
             
-            add_notification("Encuesta eliminada exitosamente", "success")
-            st.rerun()
+            add_notification(f"Encuesta #{encuesta_id} eliminada físicamente de la base de datos.", "success")
+            success_del = True
             
     except Exception as e:
-        add_notification(f"Error al eliminar: {str(e)}", "error")
+        add_notification(f"Error al eliminar físicamente: {str(e)}", "error")
+        st.session_state[f"confirm_del_{encuesta_id}"] = False
+        st.rerun()
+
+    if success_del:
+        del st.session_state[f"confirm_del_{encuesta_id}"]
+        if 'encuesta_a_eliminar' in st.session_state:
+            del st.session_state.encuesta_a_eliminar
+        st.rerun()
 
 
 def ver_encuesta_detalle(encuesta_id):
@@ -407,10 +745,16 @@ def ver_resultados_encuestas():
     
     st.subheader("Resultados de Encuestas")
     
-    if 'encuesta_resultado' in st.session_state:
-        mostrar_resultados_encuesta(st.session_state.encuesta_resultado)
+    # Priorizar el ID guardado en session_state (del botón Ver Análisis)
+    encuesta_id = st.session_state.get('encuesta_resultado')
+    
+    if encuesta_id:
+        if st.button("⬅️ Volver al selector de encuestas"):
+            del st.session_state.encuesta_resultado
+            st.rerun()
+        mostrar_resultados_encuesta(encuesta_id)
     else:
-        # Selector de encuesta
+        # Selector de encuesta si no hay una pre-seleccionada
         with get_db_cursor() as cur:
             cur.execute("""
                 SELECT id, titulo, fecha_inicio, fecha_fin
@@ -422,12 +766,12 @@ def ver_resultados_encuestas():
             
             if encuestas:
                 opciones = {f"{e[1]} ({e[2]} - {e[3]})": e[0] for e in encuestas}
-                seleccion = st.selectbox("Seleccionar Encuesta", options=list(opciones.keys()))
+                seleccion = st.selectbox("Seleccionar Encuesta para ver resultados", options=list(opciones.keys()))
                 
                 if seleccion:
                     mostrar_resultados_encuesta(opciones[seleccion])
             else:
-                st.info("No hay encuestas disponibles")
+                st.info("No hay encuestas disponibles para analizar.")
 
 def mostrar_resultados_encuesta(encuesta_id):
     """Muestra los resultados detallados de una encuesta."""
@@ -490,6 +834,47 @@ def mostrar_resultados_encuesta(encuesta_id):
         if stats[3]:
             col4.metric("Última Respuesta", stats[3].strftime('%d/%m/%Y'))
         
+        st.markdown("---")
+        
+        # Detalle por egresado
+        st.subheader("👤 Respuestas por Egresado")
+        with get_db_cursor() as cur_ind:
+            cur_ind.execute("""
+                SELECT 
+                    eg.id,
+                    eg.nombres || ' ' || eg.apellido_paterno as nombre_completo,
+                    eg.dni,
+                    COUNT(r.id) as preguntas_respondidas,
+                    MAX(r.fecha_respuesta) as ultima_fecha
+                FROM egresados eg
+                JOIN respuestas_encuesta r ON eg.id = r.egresado_id
+                WHERE r.encuesta_id = %s
+                GROUP BY eg.id, eg.nombres, eg.apellido_paterno, eg.dni
+                ORDER BY ultima_fecha DESC
+            """, (encuesta_id,))
+            respondentes = cur_ind.fetchall()
+            
+            if respondentes:
+                for res_id, nombre, dni, cant, fecha in respondentes:
+                    with st.expander(f"{nombre} (DNI: {dni}) - {cant} respuestas"):
+                        st.caption(f"Última respuesta: {fecha.strftime('%d/%m/%Y %H:%M')}")
+                        
+                        # Mostrar sus respuestas específicas
+                        cur_ind.execute("""
+                            SELECT p.texto_pregunta, r.respuesta
+                            FROM preguntas_encuesta p
+                            JOIN respuestas_encuesta r ON p.id = r.pregunta_id
+                            WHERE r.encuesta_id = %s AND r.egresado_id = %s
+                            ORDER BY p.id
+                        """, (encuesta_id, res_id))
+                        detalles = cur_ind.fetchall()
+                        for q_text, ans in detalles:
+                            st.markdown(f"**P:** {q_text}")
+                            st.markdown(f"**R:** {ans}")
+                            st.markdown("---")
+            else:
+                st.info("Aún no hay respuestas individuales para mostrar.")
+
         st.markdown("---")
         
         # Resultados por pregunta

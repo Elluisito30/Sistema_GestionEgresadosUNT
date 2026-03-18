@@ -150,6 +150,12 @@ def show():
 
     with st.container(border=True):
         st.write(f"Estado actual: {ESTADO_MAP.get(post['estado'], post['estado'])}")
+        
+        if post['estado'] == 'seleccionado':
+            st.success("🎉 ¡Felicidades! Has sido seleccionado para este puesto. La empresa se pondrá en contacto contigo pronto.")
+        elif post['estado'] == 'entrevista':
+            st.info("📅 Tienes una entrevista programada. Revisa tus medios de contacto.")
+        
         if post.get("comentario_revision"):
             st.info(f"Comentario del empleador:\n\n{post['comentario_revision']}")
         else:
