@@ -95,13 +95,15 @@ El sistema cuenta con un esquema de contraseñas unificado para las cuentas de p
     - **Edición**: Formulario tradicional con validaciones y botones de guardar/cancelar.
 - **Consultas Avanzadas**: Buscador multivariante con persistencia de resultados y exportación a **Excel** y **PDF** (corregido para zonas horarias).
 - **Dashboard Estadístico**: Gráficos interactivos de tendencia de registros y métricas de impacto.
-- **Gestión de Ofertas Laborales**:
-    - **Postulación y Seguimiento**: Los egresados pueden postular a ofertas y ver su historial de postulaciones.
-    - **Egresado Emprendedor**: Permite que los egresados publiquen sus propios emprendimientos u ofertas laborales.
-- **Sistema de Encuestas de Seguimiento**:
-    - **Diseño Dinámico (Admin)**: Creación de encuestas con múltiples tipos de preguntas (Texto, Opción Múltiple, Escala 1-10).
-    - **Plantillas Predefinidas**: Generación rápida de encuestas laborales, académicas y de satisfacción.
-    - **Módulo de Respuesta (Egresado)**: Interfaz interactiva con barra de progreso, guardado de borradores y validación de campos obligatorios.
+    - **Gestión de Ofertas Laborales**:
+        - **Postulación y Seguimiento**: Los egresados pueden postular a ofertas y ver su historial de postulaciones.
+        - **Egresado Emprendedor (Mejorado)**: Los egresados pueden publicar sus propios emprendimientos, servicios o proyectos con un formulario especializado (títulos, tipos de oferta y precios adaptados a su perfil).
+    - **Sistema de Encuestas de Seguimiento (Mejorado)**:
+        - **Diseño Dinámico (Admin)**: Creación de encuestas con múltiples tipos de preguntas (Texto, Opción Múltiple, Escala 1-10).
+        - **Asignación Específica**: Las encuestas pueden dirigirse a todos los egresados o a una lista seleccionada de personas específicas.
+        - **Gestión y Edición**: Nuevo panel de gestión con capacidad de editar encuestas existentes (configuración general y preguntas).
+        - **Análisis Detallado**: Visualización de resultados globales y respuestas individuales por egresado.
+        - **Módulo de Respuesta (Egresado)**: Interfaz interactiva con barra de progreso, guardado de borradores y validación de campos obligatorios.
 - **Pagos y Certificados**:
     - **Generación de Vouchers**: Formato estándar simplificado con **Código QR** para validación institucional.
     - **Certificados Automáticos**: Emisión de certificados PDF tras la finalización y asistencia confirmada a eventos.
